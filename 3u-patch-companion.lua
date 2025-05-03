@@ -90,12 +90,38 @@ params:add{
         default = 0,
         units = 'v',
         -- quantum = 0.01,
-        quantum = 0.001,
+        quantum = 0.0002,
         wrap = false
     },
   formatter=function(param) return string.format("%.2f", param:get()) end,
-  action=function(x) crow.ii.wsyn.fm_index(x) end
+  action=function(x)
+    crow.ii.wsyn.fm_index(x)
+    -- patch cv output 4 to the cv in of the veils channel wsyn goes through
+    -- veils slider at max, offset min, linear response
+    -- closes vca as more fm applied to compensate for perceived volume increase
+    local cv = 8 - (x / 4) * 3
+    crow.output[4].volts = cv
+    -- print("fm index: "..x..", cv: "..cv)
+  end
 }
+-- params:add{
+--   id="wsyn vca level",
+--   type="control",
+--     controlspec=controlspec.def{
+--         min = 0,
+--         max = 4.0,
+--         warp = 'lin',
+--         step = 0.01,
+--         default = 0,
+--         units = 'v',
+--         -- quantum = 0.01,
+--         quantum = 0.0002,
+--         wrap = false
+--     },
+-- }
+-- -- should be hidden from menu, only controlled by script
+-- params:hide("wsyn vca level")
+-- _menu.rebuild_params()
 params:add{
   id="wsyn fm env",
   type="control",
@@ -146,7 +172,7 @@ params:add{
         step = 0.01,
         default = -2.7,
         units = 'v',
-        quantum = 0.001,
+        quantum = 0.0002,
         wrap = false
     },
   formatter=function(param) return string.format("%.2f", param:get()) end,
