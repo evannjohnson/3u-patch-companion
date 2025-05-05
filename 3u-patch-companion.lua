@@ -27,26 +27,30 @@
 
 local event_codes = require "hid_events"
 
-bipolar5v=controlspec.def{
-    min = -5.0,
-    max = 5.0,
-    warp = 'lin',
-    step = 0.01,
-    default = 0,
-    units = 'v',
-    quantum = 0.01,
-    wrap = false
+-- these clock params just expose relevant clock params next to the other params
+params:add{
+  id="clock_bpm",
+  name="clock bpm",
+  type="number",
+  min=1,
+  max=300,
+  default=params:get("clock_tempo"),
+  action=function(x) params:set("clock_tempo", x) end
 }
-
-
--- params:add{
---   id="wsyn curve",
---   type="number",
---   min=-5,
---   max=5,
---   default=5,
---   action=function(x) crow.ii.wsyn.curve(x) end
--- }
+params:add{
+  id="crow_clock_output_3",
+  name="crow clock output 3",
+  type="binary",
+  behavior="toggle",
+  default=1,
+  action=function(x)
+    if x == 1 then
+      params:set("clock_crow_out", 4) -- "output 3"
+    else
+      params:set("clock_crow_out", 1) -- "off"
+    end
+  end
+}
 params:add{
   id="wsyn curve",
   type="control",
@@ -243,6 +247,7 @@ params:add{
   default=1000,
   action=function(x) crow.ii.txo.env_dec(4, x) end
 }
+params:default()
 params:bang()
 
 function trackball_input(typ, code, val)
