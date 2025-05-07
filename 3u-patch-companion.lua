@@ -418,23 +418,17 @@ function enc(n, d)
   params:delta(id, d)
 end
 
--- for _,p in pairs(this_params) do
---   params:add(p)
--- end
-params:default()
-params:bang()
-
 function trackball_input(typ, code, val)
   local p
   -- hid_events.codes.REL_X = 0x00
   if code == 0x00 then
-    p = "wsyn fm index"
+    p = "wsyn_fm_index"
   -- hid_events.codes.REL_Y = 0x01
   elseif code == 0x01 then
-    p = "wsyn lpg time"
+    p = "wsyn_lpg_time"
   -- hid_events.codes.REL_WHEEL = 0x08
   elseif code == 0x08 then
-    p = "wsyn fm ratio"
+    p = "wsyn_fm_ratio"
     val = -val
   end
 
