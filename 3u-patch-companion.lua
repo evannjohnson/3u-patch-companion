@@ -28,25 +28,6 @@
 local event_codes = require "hid_events"
 local pfuncs = include('lib/pfuncs')
 
-local key_param_options = {
-  ids = {
-    "crow_clock_output_3",
-    "crow_trigger_output_2"
-  },
-  names = {
-    "crow clock",
-    "reset ansible"
-  }
-}
-local enc_param_options = {
-  ids = {
-
-  },
-  names = {
-
-  }
-}
-
 -- these clock params just expose relevant clock params next to the other params
 local this_params = {}
 local clock_bpm = {
@@ -417,6 +398,9 @@ local enc_3_action = {
 this_params[enc_3_action.id] = enc_3_action
 params:add(enc_3_action)
 
+params:default()
+params:bang()
+
 function key(n, z)
   local id = key_option_to_id[key_options[params:get("key_"..n.."_action")]]
   local behavior = this_params[id].behavior
@@ -461,8 +445,3 @@ function trackball_input(typ, code, val)
 
 end
 hid.vports[1].event = trackball_input
-
--- function clock_crow()
---   clock.sync(1/4)
--- end
-
