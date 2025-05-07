@@ -63,7 +63,8 @@ params:add{
   end
 }
 params:add{
-  id="wsyn curve",
+  id="wsyn_curve",
+  name="wsyn curve",
   type="control",
   controlspec=controlspec.def{
         min = -5.0,
@@ -79,7 +80,8 @@ params:add{
   action=function(x) crow.ii.wsyn.curve(x) end
 }
 params:add{
-  id="wsyn ramp",
+  id="wsyn_ramp",
+  name="wsyn ramp",
   type="control",
   controlspec=controlspec.def{
         min = -5.0,
@@ -95,7 +97,8 @@ params:add{
   action=function(x) crow.ii.wsyn.ramp(x) end
 }
 params:add{
-  id="wsyn fm index",
+  id="wsyn_fm_index",
+  name="wsyn fm index",
   type="control",
   controlspec=controlspec.def{
         min = 0,
@@ -138,7 +141,8 @@ params:add{
 -- params:hide("wsyn vca level")
 -- _menu.rebuild_params()
 params:add{
-  id="wsyn fm env",
+  id="wsyn_fm_env",
+  name="wsyn fm env",
   type="control",
   controlspec=controlspec.def{
         min = -5,
@@ -154,7 +158,8 @@ params:add{
   action=function(x) crow.ii.wsyn.fm_env(x) end
 }
 params:add{
-  id="wsyn fm ratio",
+  id="wsyn_fm_ratio",
+  name="wsyn fm ratio",
   type="number",
   min=1,
   max=24,
@@ -162,7 +167,8 @@ params:add{
   action=function(x) crow.ii.wsyn.fm_ratio(x) end
 }
 params:add{
-  id="wsyn lpg symmetry",
+  id="wsyn_lpg_symmetry",
+  name="wsyn lpg symmetry",
   type="control",
   controlspec=controlspec.def{
         min = -5,
@@ -178,7 +184,8 @@ params:add{
   action=function(x) crow.ii.wsyn.lpg_symmetry(x) end
 }
 params:add{
-  id="wsyn lpg time",
+  id="wsyn_lpg_time",
+  name="wsyn lpg time",
   type="control",
   controlspec=controlspec.def{
         min = -4,
@@ -195,7 +202,8 @@ params:add{
 }
 
 params:add{
-  id="txo waveshape - voice 3",
+  id="txo_waveshape_-_voice_3",
+  name="txo waveshape - voice 3",
   type="number",
   min=0,
   max=4500,
@@ -203,7 +211,8 @@ params:add{
   action=function(x) crow.ii.txo.osc_wave(3, x) end
 }
 params:add{
-  id="txo level - voice 3",
+  id="txo_level_voice_3",
+  name="txo level - voice 3",
   type="control",
   controlspec=controlspec.def{
         min = 0,
@@ -219,7 +228,8 @@ params:add{
   action=function(x) crow.ii.txo.cv(3, x) end
 }
 params:add{
-  id="txo attack - voice 3",
+  id="txo_attack_voice_3",
+  name="txo attack - voice 3",
   type="number",
   min=0,
   max=5000,
@@ -227,7 +237,8 @@ params:add{
   action=function(x) crow.ii.txo.env_att(3, x) end
 }
 params:add{
-  id="txo decay - voice 3",
+  id="txo_decay_voice_3",
+  name="txo decay - voice 3",
   type="number",
   min=0,
   max=10000,
@@ -235,7 +246,8 @@ params:add{
   action=function(x) crow.ii.txo.env_dec(3, x) end
 }
 params:add{
-  id="txo waveshape - voice 4",
+  id="txo_waveshape_voice_4",
+  name="txo waveshape - voice 4",
   type="number",
   min=0,
   max=4500,
@@ -243,7 +255,8 @@ params:add{
   action=function(x) crow.ii.txo.osc_wave(4, x) end
 }
 params:add{
-  id="txo attack - voice 4",
+  id="txo_attack_voice_4",
+  name="txo attack - voice 4",
   type="number",
   min=0,
   max=5000,
@@ -251,7 +264,8 @@ params:add{
   action=function(x) crow.ii.txo.env_att(4, x) end
 }
 params:add{
-  id="txo decay - voice 4",
+  id="txo_decay_voice_4",
+  name="txo decay - voice 4",
   type="number",
   min=0,
   max=10000,
@@ -269,6 +283,18 @@ params:add{
       pfuncs.crow_ins_to_wsyn_start()
     else
       pfuncs.crow_ins_to_wsyn_stop()
+    end
+  end
+}
+params:add{
+  id="key_1_action",
+  name="key 1 action",
+  type="option",
+  options={"yes", "no", "maybe"},
+  default = 2,
+  action=function(p)
+    function key(n, z)
+
     end
   end
 }
