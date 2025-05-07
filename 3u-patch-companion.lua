@@ -52,6 +52,16 @@ params:add{
   end
 }
 params:add{
+  id="crow_trigger_output_2",
+  name="reset ansible",
+  type="binary",
+  behavior="trigger",
+  action=function(x)
+    crow.output[2].volts = 5
+    crow.output[2].volts = 0
+  end
+}
+params:add{
   id="wsyn curve",
   type="control",
   controlspec=controlspec.def{
