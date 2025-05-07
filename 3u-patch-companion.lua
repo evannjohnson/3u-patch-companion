@@ -247,6 +247,20 @@ params:add{
   default=1000,
   action=function(x) crow.ii.txo.env_dec(4, x) end
 }
+params:add{
+  id="crow_ins_to_wsyn",
+  name="crow ins to wsyn",
+  type="binary",
+  behavior="toggle",
+  default=0,
+  action=function(x)
+    if x == 1 then
+      crow_ins_to_wsyn_start()
+    else
+      crow_ins_to_wsyn_stop()
+    end
+  end
+}
 params:default()
 params:bang()
 
@@ -276,7 +290,7 @@ hid.vports[1].event = trackball_input
 --   clock.sync(1/4)
 -- end
 
-function crow_setup_for_joystick()
+function crow_ins_to_wsyn_start()
     --[[
   pos: should be 0-1
   points: an array of tables. the tables should have 2 indexes, 'pos' and 'val'.
@@ -341,22 +355,15 @@ function crow_setup_for_joystick()
       }
   }
 
-  function watch_joystick()
-      for i = 1, 2 do
-          -- crow.input[i] { mode = 'stream'
-          -- , time = 0.01
-          -- , stream = function(v) ins[i].callback(v) end }
-          crow.input[i].stream = function(v) ins[i].callback(v) end
-          crow.input[i].mode("stream", 0.01)
-      end
-  end
-
-  function no_watch_joystick()
-      for i = 1, 2 do
-          input[i] { mode = 'none' }
-      end
-  end
-
-  watch_joystick()
+  -- crow.input[i] { mode = 'stream'
+  -- , time = 0.01
+  -- , stream = function(v) ins[i].callback(v) end }
+  crow.input[i].stream = function(v) ins[i].callback(v) end
+  crow.input[i].mode("stream", 0.01)
 end
--- crow_setup_for_joystick()
+
+function crow_ins_to_wsyn_stop()
+    for i = 1, 2 do
+        crow.input[i] { mode = 'none' }
+    end
+end
