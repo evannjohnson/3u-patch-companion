@@ -1,6 +1,14 @@
 -- functions called by params
 local pfuncs = {}
 
+pfuncs.get_index_of_value = function(t, val)
+  for k,v in pairs(t) do
+    if v == val then
+      return k
+    end
+  end
+end
+
 pfuncs.crow_ins_to_wsyn_start = function ()
     --[[
   pos: should be 0-1

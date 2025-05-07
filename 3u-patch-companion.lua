@@ -28,8 +28,28 @@
 local event_codes = require "hid_events"
 local pfuncs = include('lib/pfuncs')
 
+local key_param_options = {
+  ids = {
+    "crow_clock_output_3",
+    "crow_trigger_output_2"
+  },
+  names = {
+    "crow clock",
+    "reset ansible"
+  }
+}
+local enc_param_options = {
+  ids = {
+
+  },
+  names = {
+
+  }
+}
+
 -- these clock params just expose relevant clock params next to the other params
-params:add{
+local this_params = {}
+local clock_bpm = {
   id="clock_bpm",
   name="clock bpm",
   type="number",
@@ -38,9 +58,11 @@ params:add{
   default=params:get("clock_tempo"),
   action=function(x) params:set("clock_tempo", x) end
 }
-params:add{
+this_params[clock_bpm.id] = clock_bpm
+params:add(clock_bpm)
+local crow_clock_output_3 = {
   id="crow_clock_output_3",
-  name="crow clock output 3",
+  name="crow clock out 3",
   type="binary",
   behavior="toggle",
   default=1,
@@ -52,7 +74,9 @@ params:add{
     end
   end
 }
-params:add{
+this_params[crow_clock_output_3.id] = crow_clock_output_3
+params:add(crow_clock_output_3)
+local crow_trigger_output_2 = {
   id="crow_trigger_output_2",
   name="reset ansible",
   type="binary",
@@ -62,7 +86,9 @@ params:add{
     crow.output[2].volts = 0
   end
 }
-params:add{
+this_params[crow_trigger_output_2.id] = crow_trigger_output_2
+params:add(crow_trigger_output_2)
+local wsyn_curve = {
   id="wsyn_curve",
   name="wsyn curve",
   type="control",
@@ -79,7 +105,9 @@ params:add{
   formatter=function(param) return string.format("%.2f", param:get()) end,
   action=function(x) crow.ii.wsyn.curve(x) end
 }
-params:add{
+this_params[wsyn_curve.id] = wsyn_curve
+params:add(wsyn_curve)
+local wsyn_ramp = {
   id="wsyn_ramp",
   name="wsyn ramp",
   type="control",
@@ -96,7 +124,9 @@ params:add{
   formatter=function(param) return string.format("%.2f", param:get()) end,
   action=function(x) crow.ii.wsyn.ramp(x) end
 }
-params:add{
+this_params[wsyn_ramp.id] = wsyn_ramp
+params:add(wsyn_ramp)
+local wsyn_fm_index = {
   id="wsyn_fm_index",
   name="wsyn fm index",
   type="control",
@@ -122,6 +152,8 @@ params:add{
     -- print("fm index: "..x..", cv: "..cv)
   end
 }
+this_params[wsyn_fm_index.id] = wsyn_fm_index
+params:add(wsyn_fm_index)
 -- params:add{
 --   id="wsyn vca level",
 --   type="control",
@@ -140,7 +172,7 @@ params:add{
 -- -- should be hidden from menu, only controlled by script
 -- params:hide("wsyn vca level")
 -- _menu.rebuild_params()
-params:add{
+local wsyn_fm_env = {
   id="wsyn_fm_env",
   name="wsyn fm env",
   type="control",
@@ -157,7 +189,9 @@ params:add{
   formatter=function(param) return string.format("%.2f", param:get()) end,
   action=function(x) crow.ii.wsyn.fm_env(x) end
 }
-params:add{
+this_params[wsyn_fm_env.id] = wsyn_fm_env
+params:add(wsyn_fm_env)
+local wsyn_fm_ratio = {
   id="wsyn_fm_ratio",
   name="wsyn fm ratio",
   type="number",
@@ -166,7 +200,9 @@ params:add{
   default=4,
   action=function(x) crow.ii.wsyn.fm_ratio(x) end
 }
-params:add{
+this_params[wsyn_fm_ratio.id] = wsyn_fm_ratio
+params:add(wsyn_fm_ratio)
+local wsyn_lpg_symmetry = {
   id="wsyn_lpg_symmetry",
   name="wsyn lpg symmetry",
   type="control",
@@ -183,7 +219,9 @@ params:add{
   formatter=function(param) return string.format("%.2f", param:get()) end,
   action=function(x) crow.ii.wsyn.lpg_symmetry(x) end
 }
-params:add{
+this_params[wsyn_lpg_symmetry.id] = wsyn_lpg_symmetry
+params:add(wsyn_lpg_symmetry)
+local wsyn_lpg_time = {
   id="wsyn_lpg_time",
   name="wsyn lpg time",
   type="control",
@@ -200,9 +238,10 @@ params:add{
   formatter=function(param) return string.format("%.2f", param:get()) end,
   action=function(x) crow.ii.wsyn.lpg_time(x) end
 }
-
-params:add{
-  id="txo_waveshape_-_voice_3",
+this_params[wsyn_lpg_time.id] = wsyn_lpg_time
+params:add(wsyn_lpg_time)
+local txo_waveshape_voice_3 = {
+  id="txo_waveshape_voice_3",
   name="txo waveshape - voice 3",
   type="number",
   min=0,
@@ -210,7 +249,9 @@ params:add{
   default=0,
   action=function(x) crow.ii.txo.osc_wave(3, x) end
 }
-params:add{
+this_params[txo_waveshape_voice_3.id] = txo_waveshape_voice_3
+params:add(txo_waveshape_voice_3)
+local txo_level_voice_3 = {
   id="txo_level_voice_3",
   name="txo level - voice 3",
   type="control",
@@ -227,7 +268,9 @@ params:add{
   formatter=function(param) return string.format("%.2f", param:get()) end,
   action=function(x) crow.ii.txo.cv(3, x) end
 }
-params:add{
+this_params[txo_level_voice_3.id] = txo_level_voice_3
+params:add(txo_level_voice_3)
+local txo_attack_voice_3 = {
   id="txo_attack_voice_3",
   name="txo attack - voice 3",
   type="number",
@@ -236,7 +279,9 @@ params:add{
   default=40,
   action=function(x) crow.ii.txo.env_att(3, x) end
 }
-params:add{
+this_params[txo_attack_voice_3.id] = txo_attack_voice_3
+params:add(txo_attack_voice_3)
+local txo_decay_voice_3 = {
   id="txo_decay_voice_3",
   name="txo decay - voice 3",
   type="number",
@@ -245,7 +290,9 @@ params:add{
   default=2000,
   action=function(x) crow.ii.txo.env_dec(3, x) end
 }
-params:add{
+this_params[txo_decay_voice_3.id] = txo_decay_voice_3
+params:add(txo_decay_voice_3)
+local txo_waveshape_voice_4 = {
   id="txo_waveshape_voice_4",
   name="txo waveshape - voice 4",
   type="number",
@@ -254,7 +301,9 @@ params:add{
   default=0,
   action=function(x) crow.ii.txo.osc_wave(4, x) end
 }
-params:add{
+this_params[txo_waveshape_voice_4.id] = txo_waveshape_voice_4
+params:add(txo_waveshape_voice_4)
+local txo_attack_voice_4 = {
   id="txo_attack_voice_4",
   name="txo attack - voice 4",
   type="number",
@@ -263,7 +312,9 @@ params:add{
   default=40,
   action=function(x) crow.ii.txo.env_att(4, x) end
 }
-params:add{
+this_params[txo_attack_voice_4.id] = txo_attack_voice_4
+params:add(txo_attack_voice_4)
+local txo_decay_voice_4 = {
   id="txo_decay_voice_4",
   name="txo decay - voice 4",
   type="number",
@@ -272,7 +323,9 @@ params:add{
   default=1000,
   action=function(x) crow.ii.txo.env_dec(4, x) end
 }
-params:add{
+this_params[txo_decay_voice_4.id] = txo_decay_voice_4
+params:add(txo_decay_voice_4)
+local crow_ins_to_wsyn = {
   id="crow_ins_to_wsyn",
   name="crow ins to wsyn",
   type="binary",
@@ -286,18 +339,104 @@ params:add{
     end
   end
 }
-params:add{
-  id="key_1_action",
-  name="key 1 action",
-  type="option",
-  options={"yes", "no", "maybe"},
-  default = 2,
-  action=function(p)
-    function key(n, z)
+this_params[crow_ins_to_wsyn.id] = crow_ins_to_wsyn
+params:add(crow_ins_to_wsyn)
 
-    end
+-- create key and encoder action params
+local key_options = {}
+local key_option_to_id = {}
+local enc_options = {}
+local enc_option_to_id = {}
+for _,p in pairs(this_params) do
+  if p.type == "binary" then
+    table.insert(key_options, p.name)
+    key_option_to_id[p.name] = p.id
+  elseif p.type == "number" or p.type == "control" then
+    table.insert(enc_options, p.name)
+    enc_option_to_id[p.name] = p.id
   end
+end
+
+local key_2_action = {
+    id="key_2_action",
+    name="key 2 action",
+    type="option",
+    options=key_options,
+    default = pfuncs.get_index_of_value(key_options, "crow clock out 3"),
+    action=function(p)
+    end
 }
+this_params[key_2_action.id] = key_2_action
+params:add(key_2_action)
+
+local key_3_action = {
+    id="key_3_action",
+    name="key 3 action",
+    type="option",
+    options=key_options,
+    default = pfuncs.get_index_of_value(key_options, "reset ansible"),
+    action=function(p)
+    end
+}
+this_params[key_3_action.id] = key_3_action
+params:add(key_3_action)
+
+local enc_1_action = {
+    id="enc_1_action",
+    name="enc 1 action",
+    type="option",
+    options=enc_options,
+    default = pfuncs.get_index_of_value(enc_options, "clock bpm"),
+    action=function(p)
+    end
+}
+this_params[enc_1_action.id] = enc_1_action
+params:add(enc_1_action)
+
+local enc_2_action = {
+    id="enc_2_action",
+    name="enc 2 action",
+    type="option",
+    options=enc_options,
+    default = pfuncs.get_index_of_value(enc_options, "txo attack - voice 3"),
+    action=function(p)
+    end
+}
+this_params[enc_2_action.id] = enc_2_action
+params:add(enc_2_action)
+
+local enc_3_action = {
+    id="enc_3_action",
+    name="enc 3 action",
+    type="option",
+    options=enc_options,
+    default = pfuncs.get_index_of_value(enc_options, "txo decay - voice 3"),
+    action=function(p)
+    end
+}
+this_params[enc_3_action.id] = enc_3_action
+params:add(enc_3_action)
+
+function key(n, z)
+  local id = key_option_to_id[key_options[params:get("key_"..n.."_action")]]
+  local behavior = this_params[id].behavior
+  if behavior == "toggle" and z == 1 then
+    params:set(id, 1 - params:get(id))
+  elseif behavior == "trigger" and z == 1 then
+    params:set(id, 1)
+  elseif behavior == "momentary" then
+    params:set(id, z)
+  end
+end
+
+function enc(n, d)
+  local id = enc_option_to_id[enc_options[params:get("enc_"..n.."_action")]]
+  params:delta(id, d)
+end
+
+-- for _,p in pairs(this_params) do
+--   params:add(p)
+-- end
 params:default()
 params:bang()
 
