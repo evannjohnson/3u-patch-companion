@@ -254,21 +254,46 @@ params:add(txo_level_voice_3)
 local txo_attack_voice_3 = {
   id="txo_attack_voice_3",
   name="txo attack - voice 3",
-  type="number",
-  min=0,
-  max=5000,
-  default=40,
+  type="control",
+  controlspec=controlspec.def{
+        min = 1,
+        max = 5000,
+        warp = 'exp',
+        step = 1,
+        default = 40,
+        units = 'mv',
+        quantum = 0.002,
+        wrap = false
+    },
+  -- formatter=function(param) return param:get() end,
   action=function(x) crow.ii.txo.env_att(3, x) end
 }
 this_params[txo_attack_voice_3.id] = txo_attack_voice_3
 params:add(txo_attack_voice_3)
+-- local txo_decay_voice_3 = {
+--   id="txo_decay_voice_3",
+--   name="txo decay - voice 3",
+--   type="number",
+--   min=0,
+--   max=10000,
+--   default=2000,
+--   action=function(x) crow.ii.txo.env_dec(3, x) end
+-- }
 local txo_decay_voice_3 = {
   id="txo_decay_voice_3",
   name="txo decay - voice 3",
-  type="number",
-  min=0,
-  max=10000,
-  default=2000,
+  type="control",
+  controlspec=controlspec.def{
+        min = 1,
+        max = 10000,
+        warp = 'exp',
+        step = 1,
+        default = 2000,
+        units = 'mv',
+        quantum = 0.002,
+        wrap = false
+    },
+  -- formatter=function(param) return param:get() end,
   action=function(x) crow.ii.txo.env_dec(3, x) end
 }
 this_params[txo_decay_voice_3.id] = txo_decay_voice_3
