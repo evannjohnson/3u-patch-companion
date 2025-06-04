@@ -1,8 +1,10 @@
 local event_codes = require "hid_events"
 local pfuncs = include('lib/pfuncs')
 
--- these clock params just expose relevant clock params next to the other params
+-- allows having a param that maps to params, to have a param for what param the keys and encoders control
 local this_params = {}
+
+-- these clock params just expose relevant clock params next to the other params
 local clock_bpm = {
   id="clock_bpm",
   name="clock bpm",
@@ -14,6 +16,7 @@ local clock_bpm = {
 }
 this_params[clock_bpm.id] = clock_bpm
 params:add(clock_bpm)
+
 local crow_clock_output_3 = {
   id="crow_clock_output_3",
   name="crow clock out 3",
@@ -31,6 +34,25 @@ local crow_clock_output_3 = {
 }
 this_params[crow_clock_output_3.id] = crow_clock_output_3
 params:add(crow_clock_output_3)
+
+local crow_clock_div = {
+  id="crow_clock_div",
+  name="crow clock out 3",
+  type="binary",
+  behavior="toggle",
+  default=1,
+  action=function(x)
+    if x == 1 then
+      params:set("clock_crow_out", 4) -- "output 3"
+    else
+      params:set("clock_crow_out", 1) -- "off"
+      -- pfuncs.clear_ii_voices()
+    end
+  end
+}
+this_params[crow_clock_output_3.id] = crow_clock_output_3
+params:add(crow_clock_output_3)
+
 local crow_trigger_output_2 = {
   id="crow_trigger_output_2",
   name="reset ansible",
@@ -43,6 +65,7 @@ local crow_trigger_output_2 = {
 }
 this_params[crow_trigger_output_2.id] = crow_trigger_output_2
 params:add(crow_trigger_output_2)
+
 local wsyn_curve = {
   id="wsyn_curve",
   name="wsyn curve",
@@ -62,6 +85,7 @@ local wsyn_curve = {
 }
 this_params[wsyn_curve.id] = wsyn_curve
 params:add(wsyn_curve)
+
 local wsyn_ramp = {
   id="wsyn_ramp",
   name="wsyn ramp",
@@ -81,6 +105,7 @@ local wsyn_ramp = {
 }
 this_params[wsyn_ramp.id] = wsyn_ramp
 params:add(wsyn_ramp)
+
 local wsyn_fm_index = {
   id="wsyn_fm_index",
   name="wsyn fm index",
@@ -109,6 +134,7 @@ local wsyn_fm_index = {
 }
 this_params[wsyn_fm_index.id] = wsyn_fm_index
 params:add(wsyn_fm_index)
+
 -- params:add{
 --   id="wsyn vca level",
 --   type="control",
@@ -146,6 +172,7 @@ local wsyn_fm_env = {
 }
 this_params[wsyn_fm_env.id] = wsyn_fm_env
 params:add(wsyn_fm_env)
+
 local wsyn_fm_ratio = {
   id="wsyn_fm_ratio",
   name="wsyn fm ratio",
@@ -157,6 +184,7 @@ local wsyn_fm_ratio = {
 }
 this_params[wsyn_fm_ratio.id] = wsyn_fm_ratio
 params:add(wsyn_fm_ratio)
+
 local wsyn_lpg_symmetry = {
   id="wsyn_lpg_symmetry",
   name="wsyn lpg symmetry",
@@ -176,6 +204,7 @@ local wsyn_lpg_symmetry = {
 }
 this_params[wsyn_lpg_symmetry.id] = wsyn_lpg_symmetry
 params:add(wsyn_lpg_symmetry)
+
 local wsyn_lpg_time = {
   id="wsyn_lpg_time",
   name="wsyn lpg time",
@@ -195,6 +224,7 @@ local wsyn_lpg_time = {
 }
 this_params[wsyn_lpg_time.id] = wsyn_lpg_time
 params:add(wsyn_lpg_time)
+
 local txo_waveshape_voice_3 = {
   id="txo_waveshape_voice_3",
   name="txo waveshape - voice 3",
@@ -206,6 +236,7 @@ local txo_waveshape_voice_3 = {
 }
 this_params[txo_waveshape_voice_3.id] = txo_waveshape_voice_3
 params:add(txo_waveshape_voice_3)
+
 local txo_level_voice_3 = {
   id="txo_level_voice_3",
   name="txo level - voice 3",
@@ -225,6 +256,7 @@ local txo_level_voice_3 = {
 }
 this_params[txo_level_voice_3.id] = txo_level_voice_3
 params:add(txo_level_voice_3)
+
 local txo_attack_voice_3 = {
   id="txo_attack_voice_3",
   name="txo attack - voice 3",
@@ -244,6 +276,7 @@ local txo_attack_voice_3 = {
 }
 this_params[txo_attack_voice_3.id] = txo_attack_voice_3
 params:add(txo_attack_voice_3)
+
 -- local txo_decay_voice_3 = {
 --   id="txo_decay_voice_3",
 --   name="txo decay - voice 3",
@@ -272,6 +305,7 @@ local txo_decay_voice_3 = {
 }
 this_params[txo_decay_voice_3.id] = txo_decay_voice_3
 params:add(txo_decay_voice_3)
+
 local txo_waveshape_voice_4 = {
   id="txo_waveshape_voice_4",
   name="txo waveshape - voice 4",
@@ -283,6 +317,7 @@ local txo_waveshape_voice_4 = {
 }
 this_params[txo_waveshape_voice_4.id] = txo_waveshape_voice_4
 params:add(txo_waveshape_voice_4)
+
 local txo_attack_voice_4 = {
   id="txo_attack_voice_4",
   name="txo attack - voice 4",
@@ -294,6 +329,7 @@ local txo_attack_voice_4 = {
 }
 this_params[txo_attack_voice_4.id] = txo_attack_voice_4
 params:add(txo_attack_voice_4)
+
 local txo_decay_voice_4 = {
   id="txo_decay_voice_4",
   name="txo decay - voice 4",
