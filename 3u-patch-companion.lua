@@ -387,71 +387,71 @@ for _,p in pairs(this_params) do
   end
 end
 
-local key_2_action = {
-    id="key_2_action",
-    name="key 2 action",
+local k2_action = {
+    id="k2_action",
+    name="k2 action",
     type="option",
     options=key_options,
     default = pfuncs.get_index_of_value(key_options, "crow clock out 3"),
     action=function(p)
     end
 }
-this_params[key_2_action.id] = key_2_action
-params:add(key_2_action)
+this_params[k2_action.id] = k2_action
+params:add(k2_action)
 
-local key_3_action = {
-    id="key_3_action",
-    name="key 3 action",
+local k3_action = {
+    id="k3_action",
+    name="k3 action",
     type="option",
     options=key_options,
     default = pfuncs.get_index_of_value(key_options, "reset ansible"),
     action=function(p)
     end
 }
-this_params[key_3_action.id] = key_3_action
-params:add(key_3_action)
+this_params[k3_action.id] = k3_action
+params:add(k3_action)
 
-local enc_1_action = {
-    id="enc_1_action",
-    name="enc 1 action",
+local e1_action = {
+    id="e1_action",
+    name="e1 action",
     type="option",
     options=enc_options,
     default = pfuncs.get_index_of_value(enc_options, "clock bpm"),
     action=function(p)
     end
 }
-this_params[enc_1_action.id] = enc_1_action
-params:add(enc_1_action)
+this_params[e1_action.id] = e1_action
+params:add(e1_action)
 
-local enc_2_action = {
-    id="enc_2_action",
-    name="enc 2 action",
+local e2_action = {
+    id="e2_action",
+    name="e2 action",
     type="option",
     options=enc_options,
     default = pfuncs.get_index_of_value(enc_options, "txo attack - voice 3"),
     action=function(p)
     end
 }
-this_params[enc_2_action.id] = enc_2_action
-params:add(enc_2_action)
+this_params[e2_action.id] = e2_action
+params:add(e2_action)
 
-local enc_3_action = {
-    id="enc_3_action",
-    name="enc 3 action",
+local e3_action = {
+    id="e3_action",
+    name="e3 action",
     type="option",
     options=enc_options,
     default = pfuncs.get_index_of_value(enc_options, "txo decay - voice 3"),
     action=function(p)
     end
 }
-this_params[enc_3_action.id] = enc_3_action
-params:add(enc_3_action)
+this_params[e3_action.id] = e3_action
+params:add(e3_action)
 
 params:default()
 params:bang()
 
 function key(n, z)
-  local id = key_option_to_id[key_options[params:get("key_"..n.."_action")]]
+  local id = key_option_to_id[key_options[params:get("k"..n.."_action")]]
   local behavior = this_params[id].behavior
   if behavior == "toggle" and z == 1 then
     params:set(id, 1 - params:get(id))
@@ -463,7 +463,7 @@ function key(n, z)
 end
 
 function enc(n, d)
-  local id = enc_option_to_id[enc_options[params:get("enc_"..n.."_action")]]
+  local id = enc_option_to_id[enc_options[params:get("e"..n.."_action")]]
   params:delta(id, d)
 end
 
