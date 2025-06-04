@@ -35,23 +35,37 @@ local crow_clock_output_3 = {
 this_params[crow_clock_output_3.id] = crow_clock_output_3
 params:add(crow_clock_output_3)
 
-local crow_clock_div = {
-  id="crow_clock_div",
-  name="crow clock out 3",
-  type="binary",
-  behavior="toggle",
-  default=1,
+-- controls the builtin CLOCK>crow>crow out div param, but by multiplying/dividing by 2 instead of incrementing by one
+local crow_clock_div_x2 = {
+  id="crow_clock_div_x2",
+  name="crow clock div x2",
+  type="number",
+  min=1,
+  max=32,
+  default=params:get("clock_crow_out_div"),
+  formatter=function(param)
+    local div = params:get("clock_crow_out_div")
+    params:set("crow_clock_div_x2", div)
+    return div
+  end,
   action=function(x)
-    if x == 1 then
-      params:set("clock_crow_out", 4) -- "output 3"
-    else
-      params:set("clock_crow_out", 1) -- "off"
-      -- pfuncs.clear_ii_voices()
+    local div = params:get("clock_crow_out_div")
+    -- decrease
+    if x < div then
+      div = math.floor(div/2)
+      div = math.max(1, math.min(32, div))
+      params:set("clock_crow_out_div", div)
+      params:set("crow_clock_div_x2", div)
+    elseif x > div then -- increase
+      div = div*2
+      div = math.max(1, math.min(32, div))
+      params:set("clock_crow_out_div", div)
+      params:set("crow_clock_div_x2", div)
     end
   end
 }
-this_params[crow_clock_output_3.id] = crow_clock_output_3
-params:add(crow_clock_output_3)
+this_params[crow_clock_div_x2.id] = crow_clock_div_x2
+params:add(crow_clock_div_x2)
 
 local crow_trigger_output_2 = {
   id="crow_trigger_output_2",
