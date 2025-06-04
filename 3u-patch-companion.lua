@@ -52,6 +52,7 @@ local crow_clock_output_3 = {
       params:set("clock_crow_out", 4) -- "output 3"
     else
       params:set("clock_crow_out", 1) -- "off"
+      -- pfuncs.clear_ii_voices()
     end
   end
 }

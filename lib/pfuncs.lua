@@ -87,4 +87,11 @@ pfuncs.crow_ins_to_wsyn_stop = function ()
     end
 end
 
+pfuncs.clear_ii_voices = function ()
+    crow.ii.wsyn.play_voice(1, 1, 0)
+    crow.ii.wsyn.play_voice(2, 1, 0)
+    crow.ii.wsyn.play_voice(3, 1, 0)
+    crow.ii.wsyn.play_voice(4, 1, 0)
+end
+
 return pfuncs
