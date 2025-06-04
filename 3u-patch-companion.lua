@@ -1,30 +1,3 @@
--- -- crow.ii.wsyn.ar_mode(1)
--- crow.ii.wsyn.curve(5)
--- crow.ii.wsyn.ramp(0)
--- crow.ii.wsyn.fm_index(0)
--- -- crow.ii.wsyn.fm_env(-.35) -- this offsets the minimum CV that comes out of planar
--- -- crow.ii.wsyn.fm_env(-.5) -- this offsets the minimum CV that comes out of planar when attenuated by a mystic 0tennuator at noon
--- crow.ii.wsyn.fm_env(0)
--- crow.ii.wsyn.fm_ratio(4)
--- crow.ii.wsyn.lpg_symmetry(-3.5)
--- crow.ii.wsyn.lpg_time(-2.73)
--- -- crow.ii.wsyn.patch(1, 3) -- this to fm env, use planar unipolar out
--- -- crow.ii.wsyn.patch(2, 5) -- that to lpg time
--- -- mappings = {
--- --     crow.ii.wsyn.fm_env,
--- --     crow.ii.wsyn.lpg_time
--- -- }
-
--- function initTxo()
---     clock.sleep(1)
---     crow.ii.txo.cv(3, 1)
---     crow.ii.txo.osc_wave(3, 0)
---     crow.ii.txo.env_att(3, 50)
---     crow.ii.txo.env_dec(3, 400)
--- end
-
--- clock.run(initTxo)
-
 local event_codes = require "hid_events"
 local pfuncs = include('lib/pfuncs')
 
