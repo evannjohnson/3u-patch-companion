@@ -67,18 +67,19 @@ local crow_clock_div_x2 = {
 this_params[crow_clock_div_x2.id] = crow_clock_div_x2
 params:add(crow_clock_div_x2)
 
-local crow_trigger_output_2 = {
-  id="crow_trigger_output_2",
+local reset_ansible = {
+  id="reset_ansible",
   name="reset ansible",
   type="binary",
   behavior="trigger",
   action=function(x)
-    crow.output[2].volts = 5
-    crow.output[2].volts = 0
+    -- crow.output[2].volts = 5
+    -- crow.output[2].volts = 0
+    crow.ii.txo.tr_pulse(4)
   end
 }
-this_params[crow_trigger_output_2.id] = crow_trigger_output_2
-params:add(crow_trigger_output_2)
+this_params[reset_ansible.id] = reset_ansible
+params:add(reset_ansible)
 
 local wsyn_curve = {
   id="wsyn_curve",
