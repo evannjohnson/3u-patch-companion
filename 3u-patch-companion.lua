@@ -90,8 +90,10 @@ local clock_txo_tr_3 = {
       end
     else
       crow.ii.txo.tr_m_act(3, 0)
-      clock.cancel(clock_txo_3_id)
-      clock_txo_3_id = nil
+      if (clock_txo_3_id) then
+        clock.cancel(clock_txo_3_id)
+        clock_txo_3_id = nil
+      end
     end
   end
 }
