@@ -292,15 +292,6 @@ local txo_attack_voice_3 = {
 this_params[txo_attack_voice_3.id] = txo_attack_voice_3
 params:add(txo_attack_voice_3)
 
--- local txo_decay_voice_3 = {
---   id="txo_decay_voice_3",
---   name="txo decay - voice 3",
---   type="number",
---   min=0,
---   max=10000,
---   default=2000,
---   action=function(x) crow.ii.txo.env_dec(3, x) end
--- }
 local txo_decay_voice_3 = {
   id="txo_decay_voice_3",
   name="txo decay - voice 3",
@@ -333,13 +324,41 @@ local txo_waveshape_voice_4 = {
 this_params[txo_waveshape_voice_4.id] = txo_waveshape_voice_4
 params:add(txo_waveshape_voice_4)
 
+local txo_level_voice_4 = {
+  id="txo_level_voice_4",
+  name="txo level - voice 4",
+  type="control",
+  controlspec=controlspec.def{
+        min = 0,
+        max = 8,
+        warp = 'lin',
+        step = 0.01,
+        default = 1,
+        units = 'v',
+        quantum = 0.01/8,
+        wrap = false
+    },
+  formatter=function(param) return string.format("%.2f", param:get()) end,
+  action=function(x) crow.ii.txo.cv(4, x) end
+}
+this_params[txo_level_voice_4.id] = txo_level_voice_4
+params:add(txo_level_voice_4)
+
 local txo_attack_voice_4 = {
   id="txo_attack_voice_4",
   name="txo attack - voice 4",
-  type="number",
-  min=0,
-  max=5000,
-  default=40,
+  type="control",
+  controlspec=controlspec.def{
+        min = 1,
+        max = 5000,
+        warp = 'exp',
+        step = 1,
+        default = 40,
+        units = 'mv',
+        quantum = 0.002,
+        wrap = false
+    },
+  -- formatter=function(param) return param:get() end,
   action=function(x) crow.ii.txo.env_att(4, x) end
 }
 this_params[txo_attack_voice_4.id] = txo_attack_voice_4
@@ -348,14 +367,23 @@ params:add(txo_attack_voice_4)
 local txo_decay_voice_4 = {
   id="txo_decay_voice_4",
   name="txo decay - voice 4",
-  type="number",
-  min=0,
-  max=10000,
-  default=1000,
+  type="control",
+  controlspec=controlspec.def{
+        min = 1,
+        max = 10000,
+        warp = 'exp',
+        step = 1,
+        default = 2000,
+        units = 'mv',
+        quantum = 0.002,
+        wrap = false
+    },
+  -- formatter=function(param) return param:get() end,
   action=function(x) crow.ii.txo.env_dec(4, x) end
 }
 this_params[txo_decay_voice_4.id] = txo_decay_voice_4
 params:add(txo_decay_voice_4)
+
 local crow_ins_to_wsyn = {
   id="crow_ins_to_wsyn",
   name="crow ins to wsyn",
