@@ -67,6 +67,82 @@ local crow_clock_div_x2 = {
 this_params[crow_clock_div_x2.id] = crow_clock_div_x2
 params:add(crow_clock_div_x2)
 
+local clock_txo_tr_3 = {
+  id="clock_txo_tr_3",
+  name="clock txo tr 3",
+  type="binary",
+  behavior="toggle",
+  default=1,
+  action=function(x)
+    if x == 1 then
+      -- crow.ii.txo.tr_time(3, 60/(2*clock.get_tempo()*params:get("clock_txo_3_div"))*1000)
+      crow.ii.txo.tr_time(3, 10)
+      crow.ii.txo.tr_m(3, clock.get_beat_sec() * 1000 / params:get("clock_txo_3_div"))
+      crow.ii.txo.tr_m_act(3, 1)
+      if (not clock_txo_3_id) then
+        clock_txo_3_id = clock.run(function()
+          while true do
+            clock.sync(1/params:get("clock_txo_3_div"))
+            -- crow.ii.txo.tr_pulse(3)
+            crow.ii.txo.tr_m_sync(3)
+          end
+        end)
+      end
+    else
+      crow.ii.txo.tr_m_act(3, 0)
+      clock.cancel(clock_txo_3_id)
+      clock_txo_3_id = nil
+    end
+  end
+}
+this_params[clock_txo_tr_3.id] = clock_txo_tr_3
+params:add(clock_txo_tr_3)
+
+local clock_txo_3_div = {
+  id="clock_txo_3_div",
+  name="clock div txo 3",
+  type="number",
+  min=1,
+  max=32,
+  default=16,
+  action=function(x)
+      crow.ii.txo.tr_m(3, clock.get_beat_sec() * 1000 / x)
+  end
+}
+this_params[clock_txo_3_div.id] = clock_txo_3_div
+params:add(clock_txo_3_div)
+
+local clock_txo_3_div_x2 = {
+  id="clock_txo_3_div_x2",
+  name="clock div txo 3 x2",
+  type="number",
+  min=1,
+  max=32,
+  default=params:get("clock_txo_3_div"),
+  formatter=function(param)
+    local div = params:get("clock_txo_3_div")
+    params:set("clock_txo_3_div_x2", div)
+    return div
+  end,
+  action=function(x)
+    local div = params:get("clock_txo_3_div")
+    -- decrease
+    if x < div then
+      div = math.floor(div/2)
+      div = math.max(1, math.min(32, div))
+      params:set("clock_txo_3_div", div)
+      params:set("clock_txo_3_div_x2", div)
+    elseif x > div then -- increase
+      div = div*2
+      div = math.max(1, math.min(32, div))
+      params:set("clock_txo_3_div", div)
+      params:set("clock_txo_3_div_x2", div)
+    end
+  end
+}
+this_params[clock_txo_3_div_x2.id] = clock_txo_3_div_x2
+params:add(clock_txo_3_div_x2)
+
 local reset_ansible = {
   id="reset_ansible",
   name="reset ansible",
