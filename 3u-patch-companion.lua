@@ -82,7 +82,7 @@ local clock_txo_tr_3 = {
       if (not clock_txo_3_id) then
         clock_txo_3_id = clock.run(function()
           while true do
-            clock.sync(1/params:get("clock_txo_3_div"))
+            clock.sync(1)
             -- crow.ii.txo.tr_pulse(3)
             crow.ii.txo.tr_m_sync(3)
           end
