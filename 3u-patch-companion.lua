@@ -4,6 +4,10 @@ local pfuncs = include('lib/pfuncs')
 -- allows having a param that maps to params, to have a param for what param the keys and encoders control
 local this_params = {}
 
+-- paste the following into kakoune prompt to get number of params
+-- exec \%sparams:add\(<ret>:echo<space>%val{selection_count}<ret>
+params:add_group("3u_patch_params", "3U PATCH", 35)
+
 -- these clock params just expose relevant clock params next to the other params
 local clock_bpm = {
   id="clock_bpm",
@@ -484,6 +488,8 @@ local key_options = {}
 local key_option_to_id = {}
 local enc_options = {}
 local enc_option_to_id = {}
+trackball_options = {}
+trackball_option_to_id = {}
 for _,p in pairs(this_params) do
   if p.type == "binary" then
     table.insert(key_options, p.name)
@@ -491,68 +497,131 @@ for _,p in pairs(this_params) do
   elseif p.type == "number" or p.type == "control" then
     table.insert(enc_options, p.name)
     enc_option_to_id[p.name] = p.id
+    table.insert(trackball_options, p.name)
+    trackball_option_to_id[p.name] = p.id
   end
 end
 
+local trackball_x_action = {
+  id="trackball_x_action",
+  name="ball x",
+  type="option",
+  options=trackball_options,
+  default = pfuncs.get_index_of_value(trackball_options, "wsyn fm index"),
+}
+this_params[trackball_x_action.id] = trackball_x_action
+params:add(trackball_x_action)
+
+local trackball_y_action = {
+  id="trackball_y_action",
+  name="ball y",
+  type="option",
+  options=trackball_options,
+  default = pfuncs.get_index_of_value(trackball_options, "wsyn lpg time"),
+}
+this_params[trackball_y_action.id] = trackball_y_action
+params:add(trackball_y_action)
+
+local trackball_scroll_action = {
+  id="trackball_scroll_action",
+  name="ball scroll",
+  type="option",
+  options=trackball_options,
+  default = pfuncs.get_index_of_value(trackball_options, "wsyn fm ratio"),
+}
+this_params[trackball_scroll_action.id] = trackball_scroll_action
+params:add(trackball_scroll_action)
+
+local trackball_x_invert = {
+  id="trackball_x_invert",
+  name="invert ball x",
+  type="binary",
+  behavior="toggle",
+  default = 0,
+}
+this_params[trackball_x_invert.id] = trackball_x_invert
+params:add(trackball_x_invert)
+
+local trackball_y_invert = {
+  id="trackball_y_invert",
+  name="invert ball y",
+  type="binary",
+  behavior="toggle",
+  default = 0,
+}
+this_params[trackball_y_invert.id] = trackball_y_invert
+params:add(trackball_y_invert)
+
+local trackball_scroll_invert = {
+  id="trackball_scroll_invert",
+  name="invert ball scroll",
+  type="binary",
+  behavior="toggle",
+  default = 0,
+}
+this_params[trackball_scroll_invert.id] = trackball_scroll_invert
+params:add(trackball_scroll_invert)
+
 local k2_action = {
-    id="k2_action",
-    name="k2 action",
-    type="option",
-    options=key_options,
-    default = pfuncs.get_index_of_value(key_options, "crow clock out 3"),
-    action=function(p)
-    end
+  id="k2_action",
+  name="k2",
+  type="option",
+  options=key_options,
+  default = pfuncs.get_index_of_value(key_options, "crow clock out 3"),
 }
 this_params[k2_action.id] = k2_action
 params:add(k2_action)
 
 local k3_action = {
-    id="k3_action",
-    name="k3 action",
-    type="option",
-    options=key_options,
-    default = pfuncs.get_index_of_value(key_options, "reset ansible"),
-    action=function(p)
-    end
+  id="k3_action",
+  name="k3",
+  type="option",
+  options=key_options,
+  default = pfuncs.get_index_of_value(key_options, "reset ansible"),
 }
 this_params[k3_action.id] = k3_action
 params:add(k3_action)
 
 local e1_action = {
-    id="e1_action",
-    name="e1 action",
-    type="option",
-    options=enc_options,
-    default = pfuncs.get_index_of_value(enc_options, "clock bpm"),
-    action=function(p)
-    end
+  id="e1_action",
+  name="e1",
+  type="option",
+  options=enc_options,
+  default = pfuncs.get_index_of_value(enc_options, "clock bpm"),
 }
 this_params[e1_action.id] = e1_action
 params:add(e1_action)
 
 local e2_action = {
-    id="e2_action",
-    name="e2 action",
-    type="option",
-    options=enc_options,
-    default = pfuncs.get_index_of_value(enc_options, "txo attack - voice 3"),
-    action=function(p)
-    end
+  id="e2_action",
+  name="e2",
+  type="option",
+  options=enc_options,
+  default = pfuncs.get_index_of_value(enc_options, "txo attack - voice 3"),
 }
 this_params[e2_action.id] = e2_action
 params:add(e2_action)
 
 local e3_action = {
-    id="e3_action",
-    name="e3 action",
-    type="option",
-    options=enc_options,
-    default = pfuncs.get_index_of_value(enc_options, "txo decay - voice 3"),
-    action=function(p)
-    end
+  id="e3_action",
+  name="e3",
+  type="option",
+  options=enc_options,
+  default = pfuncs.get_index_of_value(enc_options, "txo decay - voice 3"),
 }
 this_params[e3_action.id] = e3_action
 params:add(e3_action)
+
+-- allows keys and encoders to be mapped to nothing
+local empty_param = {
+  id="empty_param",
+  name="none",
+  type="binary",
+}
+this_params[empty_param.id] = empty_param
+params:add(empty_param)
+params:hide(empty_param.id)
+_menu.rebuild_params()
 
 params:default()
 params:bang()
@@ -569,29 +638,33 @@ function key(n, z)
   end
 end
 
-function enc(n, d)
+function enc(n, delta)
   local id = enc_option_to_id[enc_options[params:get("e"..n.."_action")]]
-  params:delta(id, d)
+  params:delta(id, delta)
 end
 
 function trackball_input(typ, code, val)
-  local p
-  -- hid_events.codes.REL_X = 0x00
-  if code == 0x00 then
-    p = "wsyn_fm_index"
-  -- hid_events.codes.REL_Y = 0x01
-  elseif code == 0x01 then
-    p = "wsyn_lpg_time"
-  -- hid_events.codes.REL_WHEEL = 0x08
-  elseif code == 0x08 then
-    p = "wsyn_fm_ratio"
-    val = -val
+  local param_id
+  if code == 0x00 then -- hid_events.codes.REL_X = 0x00
+    param_id = trackball_option_to_id[trackball_options[params:get("trackball_x_action")]]
+    if (params:get("trackball_x_invert") == 1) then
+      val = -val
+    end
+  elseif code == 0x01 then -- hid_events.codes.REL_Y = 0x01
+    param_id = trackball_option_to_id[trackball_options[params:get("trackball_y_action")]]
+    if (params:get("trackball_y_invert") == 1) then
+      val = -val
+    end
+  elseif code == 0x08 then -- hid_events.codes.REL_WHEEL = 0x08
+    param_id = trackball_option_to_id[trackball_options[params:get("trackball_scroll_action")]]
+    if (params:get("trackball_scroll_invert") == 1) then
+      val = -val
+    end
+    print(val)
   end
 
-  if p then
-    params:delta(p, val)
-    -- print("delta: "..val.." "..p..": "..params:get(p))
+  if (param_id) then
+    params:delta(param_id, val)
   end
-
 end
 hid.vports[1].event = trackball_input
