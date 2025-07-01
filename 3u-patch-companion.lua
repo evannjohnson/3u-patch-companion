@@ -667,4 +667,10 @@ function trackball_input(typ, code, val)
     params:delta(param_id, val)
   end
 end
-hid.vports[1].event = trackball_input
+-- hid.vports[1].event = trackball_input
+
+for i,device in pairs(hid.vports) do
+  if (device.name == "Kensington SlimBlade Pro Trackball(Wired)") then
+    device.event = trackball_input
+  end
+end
