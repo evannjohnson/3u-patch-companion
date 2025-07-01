@@ -21,7 +21,8 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
     default=params:get("clock_tempo"),
     action=function(x) params:set("clock_tempo", x) end
   }
-  params_3u_patch[clock_bpm.id] = clock_bpm
+  -- params_3u_patch[clock_bpm.id] = clock_bpm
+  table.insert(params_3u_patch, clock_bpm)
   params:add(clock_bpm)
 
   local crow_clock_output_3 = {
@@ -39,7 +40,8 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
       end
     end
   }
-  params_3u_patch[crow_clock_output_3.id] = crow_clock_output_3
+  -- params_3u_patch[crow_clock_output_3.id] = crow_clock_output_3
+  table.insert(params_3u_patch, crow_clock_output_3)
   params:add(crow_clock_output_3)
 
   -- controls the builtin CLOCK>crow>crow out div param, but by multiplying/dividing by 2 instead of incrementing by one
@@ -71,7 +73,8 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
       end
     end
   }
-  params_3u_patch[crow_clock_div_x2.id] = crow_clock_div_x2
+  -- params_3u_patch[crow_clock_div_x2.id] = crow_clock_div_x2
+  table.insert(params_3u_patch, crow_clock_div_x2)
   params:add(crow_clock_div_x2)
 
   local clock_txo_tr_3 = {
@@ -104,7 +107,8 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
       end
     end
   }
-  params_3u_patch[clock_txo_tr_3.id] = clock_txo_tr_3
+  -- params_3u_patch[clock_txo_tr_3.id] = clock_txo_tr_3
+  table.insert(params_3u_patch, clock_txo_tr_3)
   params:add(clock_txo_tr_3)
 
   local clock_txo_3_div = {
@@ -118,7 +122,8 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
         crow.ii.txo.tr_m(3, clock.get_beat_sec() * 1000 / x)
     end
   }
-  params_3u_patch[clock_txo_3_div.id] = clock_txo_3_div
+  -- params_3u_patch[clock_txo_3_div.id] = clock_txo_3_div
+  table.insert(params_3u_patch, clock_txo_3_div)
   params:add(clock_txo_3_div)
 
   local clock_txo_3_div_x2 = {
@@ -149,7 +154,8 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
       end
     end
   }
-  params_3u_patch[clock_txo_3_div_x2.id] = clock_txo_3_div_x2
+  -- params_3u_patch[clock_txo_3_div_x2.id] = clock_txo_3_div_x2
+  table.insert(params_3u_patch, clock_txo_3_div_x2)
   params:add(clock_txo_3_div_x2)
 
   local reset_ansible = {
@@ -163,7 +169,8 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
       crow.ii.txo.tr_pulse(4)
     end
   }
-  params_3u_patch[reset_ansible.id] = reset_ansible
+  -- params_3u_patch[reset_ansible.id] = reset_ansible
+  table.insert(params_3u_patch, reset_ansible)
   params:add(reset_ansible)
 
   local wsyn_curve = {
@@ -183,7 +190,8 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
     formatter=function(param) return string.format("%.2f", param:get()) end,
     action=function(x) crow.ii.wsyn.curve(x) end
   }
-  params_3u_patch[wsyn_curve.id] = wsyn_curve
+  -- params_3u_patch[wsyn_curve.id] = wsyn_curve
+  table.insert(params_3u_patch, wsyn_curve)
   params:add(wsyn_curve)
 
   local wsyn_ramp = {
@@ -203,7 +211,8 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
     formatter=function(param) return string.format("%.2f", param:get()) end,
     action=function(x) crow.ii.wsyn.ramp(x) end
   }
-  params_3u_patch[wsyn_ramp.id] = wsyn_ramp
+  -- params_3u_patch[wsyn_ramp.id] = wsyn_ramp
+  table.insert(params_3u_patch, wsyn_ramp)
   params:add(wsyn_ramp)
 
   local wsyn_fm_index = {
@@ -232,7 +241,8 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
       -- print("fm index: "..x..", cv: "..cv)
     end
   }
-  params_3u_patch[wsyn_fm_index.id] = wsyn_fm_index
+  -- params_3u_patch[wsyn_fm_index.id] = wsyn_fm_index
+  table.insert(params_3u_patch, wsyn_fm_index)
   params:add(wsyn_fm_index)
 
   -- params:add{
@@ -270,7 +280,8 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
     formatter=function(param) return string.format("%.2f", param:get()) end,
     action=function(x) crow.ii.wsyn.fm_env(x) end
   }
-  params_3u_patch[wsyn_fm_env.id] = wsyn_fm_env
+  -- params_3u_patch[wsyn_fm_env.id] = wsyn_fm_env
+  table.insert(params_3u_patch, wsyn_fm_env)
   params:add(wsyn_fm_env)
 
   local wsyn_fm_ratio = {
@@ -282,7 +293,8 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
     default=4,
     action=function(x) crow.ii.wsyn.fm_ratio(x) end
   }
-  params_3u_patch[wsyn_fm_ratio.id] = wsyn_fm_ratio
+  -- params_3u_patch[wsyn_fm_ratio.id] = wsyn_fm_ratio
+  table.insert(params_3u_patch, wsyn_fm_ratio)
   params:add(wsyn_fm_ratio)
 
   local wsyn_lpg_symmetry = {
@@ -302,7 +314,8 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
     formatter=function(param) return string.format("%.2f", param:get()) end,
     action=function(x) crow.ii.wsyn.lpg_symmetry(x) end
   }
-  params_3u_patch[wsyn_lpg_symmetry.id] = wsyn_lpg_symmetry
+  -- params_3u_patch[wsyn_lpg_symmetry.id] = wsyn_lpg_symmetry
+  table.insert(params_3u_patch, wsyn_lpg_symmetry)
   params:add(wsyn_lpg_symmetry)
 
   local wsyn_lpg_time = {
@@ -322,7 +335,8 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
     formatter=function(param) return string.format("%.2f", param:get()) end,
     action=function(x) crow.ii.wsyn.lpg_time(x) end
   }
-  params_3u_patch[wsyn_lpg_time.id] = wsyn_lpg_time
+  -- params_3u_patch[wsyn_lpg_time.id] = wsyn_lpg_time
+  table.insert(params_3u_patch, wsyn_lpg_time)
   params:add(wsyn_lpg_time)
 
   local txo_waveshape_voice_3 = {
@@ -334,7 +348,8 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
     default=0,
     action=function(x) crow.ii.txo.osc_wave(3, x) end
   }
-  params_3u_patch[txo_waveshape_voice_3.id] = txo_waveshape_voice_3
+  -- params_3u_patch[txo_waveshape_voice_3.id] = txo_waveshape_voice_3
+  table.insert(params_3u_patch, txo_waveshape_voice_3)
   params:add(txo_waveshape_voice_3)
 
   local txo_level_voice_3 = {
@@ -354,7 +369,8 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
     formatter=function(param) return string.format("%.2f", param:get()) end,
     action=function(x) crow.ii.txo.cv(3, x) end
   }
-  params_3u_patch[txo_level_voice_3.id] = txo_level_voice_3
+  -- params_3u_patch[txo_level_voice_3.id] = txo_level_voice_3
+  table.insert(params_3u_patch, txo_level_voice_3)
   params:add(txo_level_voice_3)
 
   local txo_attack_voice_3 = {
@@ -374,7 +390,8 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
     -- formatter=function(param) return param:get() end,
     action=function(x) crow.ii.txo.env_att(3, x) end
   }
-  params_3u_patch[txo_attack_voice_3.id] = txo_attack_voice_3
+  -- params_3u_patch[txo_attack_voice_3.id] = txo_attack_voice_3
+  table.insert(params_3u_patch, txo_attack_voice_3)
   params:add(txo_attack_voice_3)
 
   local txo_decay_voice_3 = {
@@ -394,7 +411,8 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
     -- formatter=function(param) return param:get() end,
     action=function(x) crow.ii.txo.env_dec(3, x) end
   }
-  params_3u_patch[txo_decay_voice_3.id] = txo_decay_voice_3
+  -- params_3u_patch[txo_decay_voice_3.id] = txo_decay_voice_3
+  table.insert(params_3u_patch, txo_decay_voice_3)
   params:add(txo_decay_voice_3)
 
   local txo_waveshape_voice_4 = {
@@ -406,7 +424,8 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
     default=0,
     action=function(x) crow.ii.txo.osc_wave(4, x) end
   }
-  params_3u_patch[txo_waveshape_voice_4.id] = txo_waveshape_voice_4
+  -- params_3u_patch[txo_waveshape_voice_4.id] = txo_waveshape_voice_4
+  table.insert(params_3u_patch, txo_waveshape_voice_4)
   params:add(txo_waveshape_voice_4)
 
   local txo_level_voice_4 = {
@@ -426,7 +445,8 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
     formatter=function(param) return string.format("%.2f", param:get()) end,
     action=function(x) crow.ii.txo.cv(4, x) end
   }
-  params_3u_patch[txo_level_voice_4.id] = txo_level_voice_4
+  -- params_3u_patch[txo_level_voice_4.id] = txo_level_voice_4
+  table.insert(params_3u_patch, txo_level_voice_4)
   params:add(txo_level_voice_4)
 
   local txo_attack_voice_4 = {
@@ -446,7 +466,8 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
     -- formatter=function(param) return param:get() end,
     action=function(x) crow.ii.txo.env_att(4, x) end
   }
-  params_3u_patch[txo_attack_voice_4.id] = txo_attack_voice_4
+  -- params_3u_patch[txo_attack_voice_4.id] = txo_attack_voice_4
+  table.insert(params_3u_patch, txo_attack_voice_4)
   params:add(txo_attack_voice_4)
 
   local txo_decay_voice_4 = {
@@ -466,7 +487,8 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
     -- formatter=function(param) return param:get() end,
     action=function(x) crow.ii.txo.env_dec(4, x) end
   }
-  params_3u_patch[txo_decay_voice_4.id] = txo_decay_voice_4
+  -- params_3u_patch[txo_decay_voice_4.id] = txo_decay_voice_4
+  table.insert(params_3u_patch, txo_decay_voice_4)
   params:add(txo_decay_voice_4)
 
   local crow_ins_to_wsyn = {
@@ -483,7 +505,8 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
       end
     end
   }
-  params_3u_patch[crow_ins_to_wsyn.id] = crow_ins_to_wsyn
+  -- params_3u_patch[crow_ins_to_wsyn.id] = crow_ins_to_wsyn
+  table.insert(params_3u_patch, crow_ins_to_wsyn)
   params:add(crow_ins_to_wsyn)
 
   -- allows keys and encoders to be mapped to nothing
@@ -492,7 +515,8 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
     name="none",
     type="number",
   }
-  params_3u_patch[empty_param.id] = empty_param
+  -- params_3u_patch[empty_param.id] = empty_param
+  table.insert(params_3u_patch, empty_param)
   params:add(empty_param)
   params:hide(empty_param.id)
   _menu.rebuild_params()
@@ -504,7 +528,15 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
   enc_option_to_id = {}
   trackball_options = {}
   trackball_option_to_id = {}
-  for _,p in pairs(params_3u_patch) do
+
+  table.insert(key_options, "none")
+  key_option_to_id["none"] = "empty_param"
+  -- table.insert(enc_options, "none")
+  -- enc_option_to_id["none"] = "empty_param"
+  -- table.insert(trackball_options, "none")
+  -- trackball_option_to_id["none"] = "empty_param"
+
+  for i,p in ipairs(params_3u_patch) do
     if p.type == "binary" then
       table.insert(key_options, p.name)
       key_option_to_id[p.name] = p.id
@@ -515,12 +547,6 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
       trackball_option_to_id[p.name] = p.id
     end
   end
-  table.insert(key_options, "none")
-  key_option_to_id["none"] = "empty_param"
-  -- table.insert(enc_options, "none")
-  -- enc_option_to_id["none"] = "empty_param"
-  -- table.insert(trackball_options, "none")
-  -- trackball_option_to_id["none"] = "empty_param"
 
   local trackball_x_action = {
     id="trackball_x_action",
@@ -529,7 +555,8 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
     options=trackball_options,
     default = pfuncs.get_index_of_value(trackball_options, "wsyn fm index"),
   }
-  params_3u_patch[trackball_x_action.id] = trackball_x_action
+  -- params_3u_patch[trackball_x_action.id] = trackball_x_action
+  table.insert(params_3u_patch, trackball_x_action)
   params:add(trackball_x_action)
 
   local trackball_y_action = {
@@ -539,7 +566,8 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
     options=trackball_options,
     default = pfuncs.get_index_of_value(trackball_options, "wsyn lpg time"),
   }
-  params_3u_patch[trackball_y_action.id] = trackball_y_action
+  -- params_3u_patch[trackball_y_action.id] = trackball_y_action
+  table.insert(params_3u_patch, trackball_y_action)
   params:add(trackball_y_action)
 
   local trackball_scroll_action = {
@@ -549,7 +577,8 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
     options=trackball_options,
     default = pfuncs.get_index_of_value(trackball_options, "wsyn fm ratio"),
   }
-  params_3u_patch[trackball_scroll_action.id] = trackball_scroll_action
+  -- params_3u_patch[trackball_scroll_action.id] = trackball_scroll_action
+  table.insert(params_3u_patch, trackball_scroll_action)
   params:add(trackball_scroll_action)
 
   local trackball_x_invert = {
@@ -559,7 +588,8 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
     behavior="toggle",
     default = 0,
   }
-  params_3u_patch[trackball_x_invert.id] = trackball_x_invert
+  -- params_3u_patch[trackball_x_invert.id] = trackball_x_invert
+  table.insert(params_3u_patch, trackball_x_invert)
   params:add(trackball_x_invert)
 
   local trackball_y_invert = {
@@ -569,7 +599,8 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
     behavior="toggle",
     default = 0,
   }
-  params_3u_patch[trackball_y_invert.id] = trackball_y_invert
+  -- params_3u_patch[trackball_y_invert.id] = trackball_y_invert
+  table.insert(params_3u_patch, trackball_y_invert)
   params:add(trackball_y_invert)
 
   local trackball_scroll_invert = {
@@ -579,7 +610,8 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
     behavior="toggle",
     default = 0,
   }
-  params_3u_patch[trackball_scroll_invert.id] = trackball_scroll_invert
+  -- params_3u_patch[trackball_scroll_invert.id] = trackball_scroll_invert
+  table.insert(params_3u_patch, trackball_scroll_invert)
   params:add(trackball_scroll_invert)
 
   local k2_action = {
@@ -589,7 +621,8 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
     options=key_options,
     default = pfuncs.get_index_of_value(key_options, "none"),
   }
-  params_3u_patch[k2_action.id] = k2_action
+  -- params_3u_patch[k2_action.id] = k2_action
+  table.insert(params_3u_patch, k2_action)
   params:add(k2_action)
 
   local k3_action = {
@@ -599,7 +632,8 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
     options=key_options,
     default = pfuncs.get_index_of_value(key_options, "none"),
   }
-  params_3u_patch[k3_action.id] = k3_action
+  -- params_3u_patch[k3_action.id] = k3_action
+  table.insert(params_3u_patch, k3_action)
   params:add(k3_action)
 
   local e1_action = {
@@ -609,7 +643,8 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
     options=enc_options,
     default = pfuncs.get_index_of_value(enc_options, "none"),
   }
-  params_3u_patch[e1_action.id] = e1_action
+  -- params_3u_patch[e1_action.id] = e1_action
+  table.insert(params_3u_patch, e1_action)
   params:add(e1_action)
 
   local e2_action = {
@@ -619,7 +654,8 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
     options=enc_options,
     default = pfuncs.get_index_of_value(enc_options, "none"),
   }
-  params_3u_patch[e2_action.id] = e2_action
+  -- params_3u_patch[e2_action.id] = e2_action
+  table.insert(params_3u_patch, e2_action)
   params:add(e2_action)
 
   local e3_action = {
@@ -629,7 +665,8 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
     options=enc_options,
     default = pfuncs.get_index_of_value(enc_options, "none"),
   }
-  params_3u_patch[e3_action.id] = e3_action
+  -- params_3u_patch[e3_action.id] = e3_action
+  table.insert(params_3u_patch, e3_action)
   params:add(e3_action)
 
   params:default()
@@ -641,7 +678,7 @@ mod.hook.register("script_post_init", "3u patch companion post init", function()
   function key(n, z)
     local id = key_option_to_id[key_options[params:get("k"..n.."_action")]]
     if (id ~= 'empty_param') then
-      local behavior = params_3u_patch[id].behavior
+      local behavior = params:lookup_param(id).behavior
       if behavior == "toggle" and z == 1 then
         params:set(id, 1 - params:get(id))
       elseif behavior == "trigger" and z == 1 then
