@@ -608,7 +608,7 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
     name="invert ball scroll",
     type="binary",
     behavior="toggle",
-    default = 0,
+    default = 1,
   }
   -- params_3u_patch[trackball_scroll_invert.id] = trackball_scroll_invert
   table.insert(params_3u_patch, trackball_scroll_invert)
