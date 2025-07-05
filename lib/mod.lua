@@ -7,9 +7,43 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
   params_3u_patch = {}
 
   -- paste the following into kakoune prompt to get number of params
+  -- actually doesn't work anymore since i'm creating some params programmatically
   -- exec \%sparams:add\(<ret>:echo<space>%val{selection_count}<ret>
-  params:add_group("3u_patch_params", "3U PATCH", 35)
+  params:add_group("3u_patch_params", "3U PATCH", 45)
   -- local group_3u = group.new("3u_patch_params", "3U PATCH", 35)
+
+  local reset_ansible = {
+    id="reset_ansible",
+    name="reset ansible",
+    type="binary",
+    behavior="trigger",
+    action=function(x)
+      crow.ii.txo.tr_pulse(3)
+    end
+  }
+  -- params_3u_patch[reset_ansible.id] = reset_ansible
+  table.insert(params_3u_patch, reset_ansible)
+  params:add(reset_ansible)
+
+  local bang_params = {
+    id="bang_params",
+    name="bang",
+    type="binary",
+    behavior="trigger",
+    action=function() params:bang() end
+  }
+  -- params_3u_patch[bang_params.id] = bang_params
+  -- table.insert(params_3u_patch, bang_params)
+  params:add(bang_params)
+
+  function update_txo_clocks()
+    for i=1,4 do
+      local base_id = "clock_txo_tr_"..i
+      if params:get(base_id) == 1 then
+        crow.ii.txo.tr_m(i, clock.get_beat_sec() * 1000 / params:get(base_id.."_div"))
+      end
+    end
+  end
 
   -- these clock params just expose relevant clock params next to the other params
   local clock_bpm = {
@@ -19,18 +53,226 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
     min=1,
     max=300,
     default=params:get("clock_tempo"),
-    action=function(x) params:set("clock_tempo", x) end
+    action=function(x)
+      params:set("clock_tempo", x)
+      update_txo_clocks()
+    end
   }
   -- params_3u_patch[clock_bpm.id] = clock_bpm
   table.insert(params_3u_patch, clock_bpm)
   params:add(clock_bpm)
+
+  function make_txo_m_toggle_func(port)
+    return function(z)
+      local base_id = "clock_txo_tr_"..port
+      local base_name = "clock txo "..port
+
+      if z == 1 then
+        -- crow.ii.txo.tr_time(3, 60/(2*clock.get_tempo()*params:get("clock_txo_3_div"))*1000)
+        crow.ii.txo.tr_time(port, 10)
+        crow.ii.txo.tr_m(port, clock.get_beat_sec() * 1000 / params:get(base_id.."_div"))
+        crow.ii.txo.tr_m_act(port, 1)
+        if (not clock_txo_m_id) then
+          clock_txo_m_id = clock.run(function()
+            while true do
+              clock.sync(1)
+              crow.ii.txo.m_sync(1)
+            end
+          end)
+        end
+
+        params:lookup_param(base_id).name = "● "..base_name
+        params:show(base_id.."_div")
+        params:show(base_id.."_div_x2")
+        _menu.rebuild_params()
+      else
+        crow.ii.txo.tr_m_act(port, 0)
+        if (clock_txo_m_id and
+          params:get("clock_txo_tr_1") == 0 and
+          params:get("clock_txo_tr_2") == 0 and
+          params:get("clock_txo_tr_3") == 0 and
+          params:get("clock_txo_tr_4") == 0) then
+          clock.cancel(clock_txo_m_id)
+          clock_txo_m_id = nil
+        end
+
+        params:lookup_param(base_id).name = "○ "..base_name
+        params:hide(base_id.."_div")
+        params:hide(base_id.."_div_x2")
+        _menu.rebuild_params()
+      end
+    end
+  end
+
+  function make_txo_m_div_func(port)
+    return function(div)
+      crow.ii.txo.tr_m(port, clock.get_beat_sec() * 1000 / div)
+    end
+  end
+
+  for i=1,4 do
+    local base_id = "clock_txo_tr_"..i
+    local div_id = base_id.."_div"
+    local base_name = "clock txo "..i
+
+    local base_param = {
+      id=base_id,
+      name="○ "..base_name,
+      type="binary",
+      behavior="toggle",
+      default=0,
+      action=make_txo_m_toggle_func(i)
+    }
+    -- params_3u_patch[base_table.id] = base_table
+    table.insert(params_3u_patch, base_param)
+    params:add(base_param)
+
+    div_param = {
+      id=base_id.."_div",
+      name="   div",
+      type="number",
+      min=1,
+      max=32,
+      default=16,
+      action=make_txo_m_div_func(i)
+    }
+    table.insert(params_3u_patch, div_param)
+    params:add(div_param)
+    if params:get(base_id) == 0 then
+        params:hide(base_id.."_div")
+        _menu.rebuild_params()
+    end
+
+    div_x2_param = {
+      id=div_id.."_x2",
+      name="     x2",
+      type="number",
+      min=1,
+      max=32,
+      default=params:get(div_id),
+      formatter=function(val)
+        local div = params:get(div_id)
+        params:set(div_id.."_x2", div)
+        return div
+      end,
+      action=function(x)
+        local div = params:get(div_id)
+        -- decrease
+        if x < div then
+          div = math.floor(div/2)
+          div = math.max(1, math.min(32, div))
+          params:set(div_id, div)
+          params:set(div_id.."_x2", div)
+        elseif x > div then -- increase
+          div = div*2
+          div = math.max(1, math.min(32, div))
+          params:set(div_id, div)
+          params:set(div_id.."_x2", div)
+        end
+      end
+    }
+    -- params_3u_patch[clock_txo_3_div_x2.id] = clock_txo_3_div_x2
+    table.insert(params_3u_patch, div_x2_param)
+    params:add(div_x2_param)
+    if params:get(base_id) == 0 then
+      params:hide(base_id.."_div")
+      _menu.rebuild_params()
+    end
+  end
+
+  params:lookup_param("clock_txo_tr_4").default = 1
+  params:lookup_param("clock_txo_tr_4_div").default = 16
+
+  -- local clock_txo_tr_3 = {
+  --   id="clock_txo_tr_3",
+  --   name="○ clock txo 3",
+  --   type="binary",
+  --   behavior="toggle",
+  --   default=1,
+  --   action=function(x)
+  --     if x == 1 then
+  --       -- crow.ii.txo.tr_time(3, 60/(2*clock.get_tempo()*params:get("clock_txo_3_div"))*1000)
+  --       crow.ii.txo.tr_time(3, 10)
+  --       crow.ii.txo.tr_m(3, clock.get_beat_sec() * 1000 / params:get("clock_txo_3_div"))
+  --       crow.ii.txo.tr_m_act(3, 1)
+  --       if (not clock_txo_m_id) then
+  --         clock_txo_m_id = clock.run(function()
+  --           while true do
+  --             clock.sync(1)
+  --             -- crow.ii.txo.tr_pulse(3)
+  --             crow.ii.txo.m_sync(1)
+  --           end
+  --         end)
+  --       end
+  --     else
+  --       crow.ii.txo.tr_m_act(3, 0)
+  --       if (clock_txo_m_id and
+  --         params:get("clock_txo_tr_1") == 0 and
+  --         params:get("clock_txo_tr_2") == 0 and
+  --         params:get("clock_txo_tr_4") == 0) then
+  --         clock.cancel(clock_txo_m_id)
+  --         clock_txo_m_id = nil
+  --       end
+  --     end
+  --   end
+  -- }
+  -- params_3u_patch[clock_txo_tr_3.id] = clock_txo_tr_3
+  -- table.insert(params_3u_patch, clock_txo_tr_3)
+  -- params:add(clock_txo_tr_3)
+
+  -- local clock_txo_3_div = {
+  --   id="clock_txo_3_div",
+  --   name="clock div txo 3",
+  --   type="number",
+  --   min=1,
+  --   max=32,
+  --   default=16,
+  --   action=function(x)
+  --       crow.ii.txo.tr_m(3, clock.get_beat_sec() * 1000 / x)
+  --   end
+  -- }
+  -- -- params_3u_patch[clock_txo_3_div.id] = clock_txo_3_div
+  -- table.insert(params_3u_patch, clock_txo_3_div)
+  -- params:add(clock_txo_3_div)
+
+  -- local clock_txo_3_div_x2 = {
+  --   id="clock_txo_3_div_x2",
+  --   name="clock div txo 3 x2",
+  --   type="number",
+  --   min=1,
+  --   max=32,
+  --   default=params:get("clock_txo_3_div"),
+  --   formatter=function(param)
+  --     local div = params:get("clock_txo_3_div")
+  --     params:set("clock_txo_3_div_x2", div)
+  --     return div
+  --   end,
+  --   action=function(x)
+  --     local div = params:get("clock_txo_3_div")
+  --     -- decrease
+  --     if x < div then
+  --       div = math.floor(div/2)
+  --       div = math.max(1, math.min(32, div))
+  --       params:set("clock_txo_3_div", div)
+  --       params:set("clock_txo_3_div_x2", div)
+  --     elseif x > div then -- increase
+  --       div = div*2
+  --       div = math.max(1, math.min(32, div))
+  --       params:set("clock_txo_3_div", div)
+  --       params:set("clock_txo_3_div_x2", div)
+  --     end
+  --   end
+  -- }
+  -- -- params_3u_patch[clock_txo_3_div_x2.id] = clock_txo_3_div_x2
+  -- table.insert(params_3u_patch, clock_txo_3_div_x2)
+  -- params:add(clock_txo_3_div_x2)
 
   local crow_clock_output_3 = {
     id="crow_clock_output_3",
     name="crow clock out 3",
     type="binary",
     behavior="toggle",
-    default=1,
+    default=0,
     action=function(x)
       if x == 1 then
         params:set("clock_crow_out", 4) -- "output 3"
@@ -76,102 +318,6 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
   -- params_3u_patch[crow_clock_div_x2.id] = crow_clock_div_x2
   table.insert(params_3u_patch, crow_clock_div_x2)
   params:add(crow_clock_div_x2)
-
-  local clock_txo_tr_3 = {
-    id="clock_txo_tr_3",
-    name="clock txo tr 3",
-    type="binary",
-    behavior="toggle",
-    default=1,
-    action=function(x)
-      if x == 1 then
-        -- crow.ii.txo.tr_time(3, 60/(2*clock.get_tempo()*params:get("clock_txo_3_div"))*1000)
-        crow.ii.txo.tr_time(3, 10)
-        crow.ii.txo.tr_m(3, clock.get_beat_sec() * 1000 / params:get("clock_txo_3_div"))
-        crow.ii.txo.tr_m_act(3, 1)
-        if (not clock_txo_3_id) then
-          clock_txo_3_id = clock.run(function()
-            while true do
-              clock.sync(1)
-              -- crow.ii.txo.tr_pulse(3)
-              crow.ii.txo.tr_m_sync(3)
-            end
-          end)
-        end
-      else
-        crow.ii.txo.tr_m_act(3, 0)
-        if (clock_txo_3_id) then
-          clock.cancel(clock_txo_3_id)
-          clock_txo_3_id = nil
-        end
-      end
-    end
-  }
-  -- params_3u_patch[clock_txo_tr_3.id] = clock_txo_tr_3
-  table.insert(params_3u_patch, clock_txo_tr_3)
-  params:add(clock_txo_tr_3)
-
-  local clock_txo_3_div = {
-    id="clock_txo_3_div",
-    name="clock div txo 3",
-    type="number",
-    min=1,
-    max=32,
-    default=16,
-    action=function(x)
-        crow.ii.txo.tr_m(3, clock.get_beat_sec() * 1000 / x)
-    end
-  }
-  -- params_3u_patch[clock_txo_3_div.id] = clock_txo_3_div
-  table.insert(params_3u_patch, clock_txo_3_div)
-  params:add(clock_txo_3_div)
-
-  local clock_txo_3_div_x2 = {
-    id="clock_txo_3_div_x2",
-    name="clock div txo 3 x2",
-    type="number",
-    min=1,
-    max=32,
-    default=params:get("clock_txo_3_div"),
-    formatter=function(param)
-      local div = params:get("clock_txo_3_div")
-      params:set("clock_txo_3_div_x2", div)
-      return div
-    end,
-    action=function(x)
-      local div = params:get("clock_txo_3_div")
-      -- decrease
-      if x < div then
-        div = math.floor(div/2)
-        div = math.max(1, math.min(32, div))
-        params:set("clock_txo_3_div", div)
-        params:set("clock_txo_3_div_x2", div)
-      elseif x > div then -- increase
-        div = div*2
-        div = math.max(1, math.min(32, div))
-        params:set("clock_txo_3_div", div)
-        params:set("clock_txo_3_div_x2", div)
-      end
-    end
-  }
-  -- params_3u_patch[clock_txo_3_div_x2.id] = clock_txo_3_div_x2
-  table.insert(params_3u_patch, clock_txo_3_div_x2)
-  params:add(clock_txo_3_div_x2)
-
-  local reset_ansible = {
-    id="reset_ansible",
-    name="reset ansible",
-    type="binary",
-    behavior="trigger",
-    action=function(x)
-      -- crow.output[2].volts = 5
-      -- crow.output[2].volts = 0
-      crow.ii.txo.tr_pulse(4)
-    end
-  }
-  -- params_3u_patch[reset_ansible.id] = reset_ansible
-  table.insert(params_3u_patch, reset_ansible)
-  params:add(reset_ansible)
 
   local wsyn_curve = {
     id="wsyn_curve",
