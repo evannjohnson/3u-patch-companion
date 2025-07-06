@@ -18,7 +18,7 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
     type="binary",
     behavior="trigger",
     action=function(x)
-      crow.ii.txo.tr_pulse(3)
+      crow.ii.txo.tr_pulse(2)
     end
   }
   -- params_3u_patch[reset_ansible.id] = reset_ansible
@@ -123,7 +123,9 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
       default=0,
       action=make_txo_m_toggle_func(i)
     }
-    -- params_3u_patch[base_table.id] = base_table
+    if i == 3 or i == 4 then
+      base_param.default = 1
+    end
     table.insert(params_3u_patch, base_param)
     params:add(base_param)
 
@@ -171,7 +173,7 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
         end
       end
     }
-    -- params_3u_patch[clock_txo_3_div_x2.id] = clock_txo_3_div_x2
+
     table.insert(params_3u_patch, div_x2_param)
     params:add(div_x2_param)
     if params:get(base_id) == 0 then
@@ -179,93 +181,6 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
       _menu.rebuild_params()
     end
   end
-
-  params:lookup_param("clock_txo_tr_4").default = 1
-  params:lookup_param("clock_txo_tr_4_div").default = 16
-
-  -- local clock_txo_tr_3 = {
-  --   id="clock_txo_tr_3",
-  --   name="○ clock txo 3",
-  --   type="binary",
-  --   behavior="toggle",
-  --   default=1,
-  --   action=function(x)
-  --     if x == 1 then
-  --       -- crow.ii.txo.tr_time(3, 60/(2*clock.get_tempo()*params:get("clock_txo_3_div"))*1000)
-  --       crow.ii.txo.tr_time(3, 10)
-  --       crow.ii.txo.tr_m(3, clock.get_beat_sec() * 1000 / params:get("clock_txo_3_div"))
-  --       crow.ii.txo.tr_m_act(3, 1)
-  --       if (not clock_txo_m_id) then
-  --         clock_txo_m_id = clock.run(function()
-  --           while true do
-  --             clock.sync(1)
-  --             -- crow.ii.txo.tr_pulse(3)
-  --             crow.ii.txo.m_sync(1)
-  --           end
-  --         end)
-  --       end
-  --     else
-  --       crow.ii.txo.tr_m_act(3, 0)
-  --       if (clock_txo_m_id and
-  --         params:get("clock_txo_tr_1") == 0 and
-  --         params:get("clock_txo_tr_2") == 0 and
-  --         params:get("clock_txo_tr_4") == 0) then
-  --         clock.cancel(clock_txo_m_id)
-  --         clock_txo_m_id = nil
-  --       end
-  --     end
-  --   end
-  -- }
-  -- params_3u_patch[clock_txo_tr_3.id] = clock_txo_tr_3
-  -- table.insert(params_3u_patch, clock_txo_tr_3)
-  -- params:add(clock_txo_tr_3)
-
-  -- local clock_txo_3_div = {
-  --   id="clock_txo_3_div",
-  --   name="clock div txo 3",
-  --   type="number",
-  --   min=1,
-  --   max=32,
-  --   default=16,
-  --   action=function(x)
-  --       crow.ii.txo.tr_m(3, clock.get_beat_sec() * 1000 / x)
-  --   end
-  -- }
-  -- -- params_3u_patch[clock_txo_3_div.id] = clock_txo_3_div
-  -- table.insert(params_3u_patch, clock_txo_3_div)
-  -- params:add(clock_txo_3_div)
-
-  -- local clock_txo_3_div_x2 = {
-  --   id="clock_txo_3_div_x2",
-  --   name="clock div txo 3 x2",
-  --   type="number",
-  --   min=1,
-  --   max=32,
-  --   default=params:get("clock_txo_3_div"),
-  --   formatter=function(param)
-  --     local div = params:get("clock_txo_3_div")
-  --     params:set("clock_txo_3_div_x2", div)
-  --     return div
-  --   end,
-  --   action=function(x)
-  --     local div = params:get("clock_txo_3_div")
-  --     -- decrease
-  --     if x < div then
-  --       div = math.floor(div/2)
-  --       div = math.max(1, math.min(32, div))
-  --       params:set("clock_txo_3_div", div)
-  --       params:set("clock_txo_3_div_x2", div)
-  --     elseif x > div then -- increase
-  --       div = div*2
-  --       div = math.max(1, math.min(32, div))
-  --       params:set("clock_txo_3_div", div)
-  --       params:set("clock_txo_3_div_x2", div)
-  --     end
-  --   end
-  -- }
-  -- -- params_3u_patch[clock_txo_3_div_x2.id] = clock_txo_3_div_x2
-  -- table.insert(params_3u_patch, clock_txo_3_div_x2)
-  -- params:add(clock_txo_3_div_x2)
 
   local crow_clock_output_3 = {
     id="crow_clock_output_3",
