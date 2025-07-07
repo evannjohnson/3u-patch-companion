@@ -9,7 +9,7 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
   -- paste the following into kakoune prompt to get number of params
   -- actually doesn't work anymore since i'm creating some params programmatically
   -- exec \%sparams:add\(<ret>:echo<space>%val{selection_count}<ret>
-  params:add_group("3u_patch_params", "3U PATCH", 45)
+  params:add_group("3u_patch_params", "3U PATCH", 46)
   -- local group_3u = group.new("3u_patch_params", "3U PATCH", 35)
 
   local reset_ansible = {
@@ -131,7 +131,7 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
 
     div_param = {
       id=base_id.."_div",
-      name="   div",
+      name=base_name.." div",
       type="number",
       min=1,
       max=32,
@@ -147,7 +147,7 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
 
     div_x2_param = {
       id=div_id.."_x2",
-      name="     x2",
+      name=base_name.." div x2",
       type="number",
       min=1,
       max=32,
@@ -181,6 +181,20 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
       _menu.rebuild_params()
     end
   end
+
+  local txo_cv_3_oct = {
+    id="txo_cv_3_oct",
+    name="txo cv 3 oct",
+    type="number",
+    min=-5,
+    max=5,
+    default=0,
+    action=function(x)
+      crow.ii.txo.cv_n(3, 12 * x)
+    end
+  }
+  table.insert(params_3u_patch, txo_cv_3_oct)
+  params:add(txo_cv_3_oct)
 
   local crow_clock_output_3 = {
     id="crow_clock_output_3",
@@ -735,6 +749,18 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
 end)
 
 mod.hook.register("script_post_init", "3u patch companion post init", function()
+  redraw_capture_metro = metro.init(function()
+    if _menu.mode == true then
+      return
+    elseif _menu.mode == false then
+      _script_redraw = redraw
+      metro.free(redraw_capture_metro.id)
+    else
+      print("_menu.mode behavior has changed, mod unable to wrap script's redraw function")
+    end
+  end, 1/10)
+  redraw_capture_metro:start()
+
   key_wrapped = key
   function key(n, z)
     local id = key_option_to_id[key_options[params:get("k"..n.."_action")]]
@@ -790,3 +816,4 @@ mod.hook.register("script_post_init", "3u patch companion post init", function()
     end
   end
 end)
+
