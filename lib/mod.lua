@@ -1,5 +1,15 @@
 local mod = require 'core/mods'
 
+function darken_buffer(buf, level)
+  level = level or 1
+  local t = {}
+  for i = 1, #buf do
+      local byte = buf:byte(i) - level
+      t[i] = string.char(byte < 0 and 0 or byte)
+  end
+  return table.concat(t)
+end
+
 mod.hook.register("script_pre_init", "3u patch companion pre init", function()
   local pfuncs = include('3u-patch-companion/lib/pfuncs')
 
@@ -9,8 +19,20 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
   -- paste the following into kakoune prompt to get number of params
   -- actually doesn't work anymore since i'm creating some params programmatically
   -- exec \%sparams:add\(<ret>:echo<space>%val{selection_count}<ret>
-  params:add_group("3u_patch_params", "3U PATCH", 46)
+  params:add_group("3u_patch_params", "3U PATCH", 48)
   -- local group_3u = group.new("3u_patch_params", "3U PATCH", 35)
+
+  -- allows keys and encoders to be mapped to nothing
+  local empty_param = {
+    id="empty_param",
+    name="none",
+    type="number",
+  }
+  -- params_3u_patch[empty_param.id] = empty_param
+  table.insert(params_3u_patch, empty_param)
+  params:add(empty_param)
+  params:hide(empty_param.id)
+  _menu.rebuild_params()
 
   local reset_ansible = {
     id="reset_ansible",
@@ -193,8 +215,126 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
       crow.ii.txo.cv_n(3, 12 * x)
     end
   }
-  table.insert(params_3u_patch, txo_cv_3_oct)
+  -- table.insert(params_3u_patch, txo_cv_3_oct)
   params:add(txo_cv_3_oct)
+
+  local txo_cv_3_oct_delta = {
+    id="txo_cv_3_oct_delta",
+    name="txo cv 3 oct",
+    type="number",
+    min=-3,
+    max=3,
+    default=0,
+    action = function(x)
+      local txo_cv_3_oct_v = params:get("txo_cv_3_oct")
+
+      if x == 3 and txo_cv_3_oct_v < 5 then
+        params:delta("txo_cv_3_oct", 1)
+        params:set("txo_cv_3_oct_delta", 0)
+        return
+      elseif x == -3 and txo_cv_3_oct_v > -5 then
+        params:delta("txo_cv_3_oct", -1)
+        params:set("txo_cv_3_oct_delta", 0)
+        return
+      end
+      txo_cv_3_oct_v = params:get("txo_cv_3_oct")
+
+      if params:get("draw_changes") == 1 and
+      (redraw == _script_redraw or redraw == _mod_redraw) then
+        moon_map = {}
+        moon_map[-5] = -9
+        moon_map[-4] = -7
+        moon_map[-3] = -5
+        moon_map[-2] = -4
+        moon_map[-1] = -2
+        moon_map[0] = 0
+        moon_map[1] = 2
+        moon_map[2] = 4
+        moon_map[3] = 5
+        moon_map[4] = 7
+        moon_map[5] = 9
+
+        -- some alpha values cause strange results with level_a
+        moon_alpha_map = {}
+        moon_alpha_map[1] = .1
+        moon_alpha_map[2] = .2
+        moon_alpha_map[3] = .25
+        moon_alpha_map[4] = .4
+        moon_alpha_map[5] = .5
+        moon_alpha_map[6] = .65
+        moon_alpha_map[7] = .75
+        moon_alpha_map[8] = .8
+        moon_alpha_map[9] = .9
+        moon_alpha_map[10] = 1
+        moon_alpha_map[11] = 1
+
+        moon_loc = {
+          x = 110,
+          y = 1,
+          w = 12
+        }
+
+        if moon_metro then
+          metro.free(moon_metro.id)
+        end
+        moon_fade_counter = 0
+        moon_metro = metro.init(function()
+          if moon_fade_counter > 20 then
+            restore_redraw(_script_redraw)
+            metro.free(moon_metro.id)
+            moon_metro = nil
+            params:lookup_param("txo_cv_3_oct_delta").value = 0
+            return
+          else
+            moon_fade_counter = moon_fade_counter + 1
+          end
+        end, 1/10)
+        moon_metro:start()
+        moon_fade_alpha = moon_fade_alpha or .5
+        -- print("delta "..d)
+
+        redraw = function()
+          _script_redraw()
+
+          screen.level(0)
+          screen.rect(moon_loc.x-1, moon_loc.y-1, moon_loc.w+2, moon_loc.w + 5)
+          screen.fill()
+
+          screen.display_png(_path.code.."3u-patch-companion/pngs/moon"
+                            ..tostring(moon_map[txo_cv_3_oct_v])
+                            ..".png", moon_loc.x, moon_loc.y)
+
+          screen.level(15)
+          local delta = params:get("txo_cv_3_oct_delta")
+          if delta == 2 then
+            screen.pixel(moon_loc.x + 7, moon_loc.y + 13)
+            screen.pixel(moon_loc.x + 10, moon_loc.y + 13)
+          elseif delta == 1 then
+            screen.pixel(moon_loc.x + 7, moon_loc.y + 13)
+          elseif delta == -1 then
+            screen.pixel(moon_loc.x + 4, moon_loc.y + 13)
+          elseif delta == -2 then
+            screen.pixel(moon_loc.x + 4, moon_loc.y + 13)
+            screen.pixel(moon_loc.x + 1, moon_loc.y + 13)
+          end
+          screen.fill()
+
+          if moon_fade_counter > 10 then
+            screen.level_a(0, moon_alpha_map[moon_fade_counter - 10])
+            screen.rect(moon_loc.x-1, moon_loc.y-1, moon_loc.w+2, moon_loc.w + 5)
+            screen.fill()
+          end
+
+          screen.update()
+        end
+        _mod_redraw = redraw
+      end
+    end
+  }
+  table.insert(params_3u_patch, txo_cv_3_oct_delta)
+  params:add(txo_cv_3_oct_delta)
+  params:hide("txo_cv_3_oct_delta")
+  _menu.rebuild_params()
 
   local crow_clock_output_3 = {
     id="crow_clock_output_3",
@@ -584,18 +724,6 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
   table.insert(params_3u_patch, crow_ins_to_wsyn)
   params:add(crow_ins_to_wsyn)
 
-  -- allows keys and encoders to be mapped to nothing
-  local empty_param = {
-    id="empty_param",
-    name="none",
-    type="number",
-  }
-  -- params_3u_patch[empty_param.id] = empty_param
-  table.insert(params_3u_patch, empty_param)
-  params:add(empty_param)
-  params:hide(empty_param.id)
-  _menu.rebuild_params()
-
   -- create key and encoder action params
   key_options = {}
   key_option_to_id = {}
@@ -744,22 +872,23 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
   table.insert(params_3u_patch, e3_action)
   params:add(e3_action)
 
+  local draw_changes = {
+    id="draw_changes",
+    name="draw changes",
+    type="binary",
+    behavior="toggle",
+    default=0
+  }
+  -- params_3u_patch[bang_params.id] = bang_params
+  -- table.insert(params_3u_patch, bang_params)
+  params:add(draw_changes)
+
   params:default()
   params:bang()
 end)
 
 mod.hook.register("script_post_init", "3u patch companion post init", function()
-  redraw_capture_metro = metro.init(function()
-    if _menu.mode == true then
-      return
-    elseif _menu.mode == false then
-      _script_redraw = redraw
-      metro.free(redraw_capture_metro.id)
-    else
-      print("_menu.mode behavior has changed, mod unable to wrap script's redraw function")
-    end
-  end, 1/10)
-  redraw_capture_metro:start()
+  capture_redraw()
 
   key_wrapped = key
   function key(n, z)
@@ -816,4 +945,46 @@ mod.hook.register("script_post_init", "3u patch companion post init", function()
     end
   end
 end)
+
+function capture_redraw()
+  if redraw_capture_metro then
+    print("redraw capture metro already exists")
+  end
+
+  redraw_capture_metro = metro.init(function()
+    if _menu.mode == true then
+      return
+    elseif _menu.mode == false then
+      _script_redraw = redraw
+      metro.free(redraw_capture_metro.id)
+      redraw_capture_metro = nil
+    else
+      print("_menu.mode behavior has changed, mod unable to wrap script's redraw function")
+    end
+  end, 1/10)
+  redraw_capture_metro:start()
+end
+
+function restore_redraw(redraw_func)
+  if redraw_restore_metro then
+    print("redraw restore metro already exists")
+    return
+  elseif redraw_func == nil then
+    print("redraw restore function cannot be nil")
+    return
+  end
+
+  redraw_restore_metro = metro.init(function()
+    if _menu.mode == true then
+      return
+    elseif _menu.mode == false then
+      redraw = redraw_func
+      metro.free(redraw_restore_metro.id)
+      redraw_restore_metro = nil
+    else
+      print("_menu.mode behavior has changed, mod unable to restore script's redraw function")
+    end
+  end, 1/10)
+  redraw_restore_metro:start()
+end
 
