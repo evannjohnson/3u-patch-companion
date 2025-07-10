@@ -19,8 +19,7 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
   -- paste the following into kakoune prompt to get number of params
   -- actually doesn't work anymore since i'm creating some params programmatically
   -- exec \%sparams:add\(<ret>:echo<space>%val{selection_count}<ret>
-  params:add_group("3u_patch_params", "3U PATCH", 48)
-  -- local group_3u = group.new("3u_patch_params", "3U PATCH", 35)
+  params:add_group("3u_patch_params", "3U PATCH", 61)
 
   -- allows keys and encoders to be mapped to nothing
   local empty_param = {
@@ -554,157 +553,165 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
   table.insert(params_3u_patch, wsyn_lpg_time)
   params:add(wsyn_lpg_time)
 
-  local txo_waveshape_voice_3 = {
-    id="txo_waveshape_voice_3",
-    name="txo waveshape - voice 3",
-    type="number",
-    min=0,
-    max=4500,
-    default=0,
-    action=function(x) crow.ii.txo.osc_wave(3, x) end
-  }
-  -- params_3u_patch[txo_waveshape_voice_3.id] = txo_waveshape_voice_3
-  table.insert(params_3u_patch, txo_waveshape_voice_3)
-  params:add(txo_waveshape_voice_3)
+  function make_txo_voice_show_function(port)
+    return function(z)
+      local base_id = "txo_voice_"..port
+      local show_id = base_id.."_show"
+      local base_name = "txo voice "..port
 
-  local txo_level_voice_3 = {
-    id="txo_level_voice_3",
-    name="txo level - voice 3",
-    type="control",
-    controlspec=controlspec.def{
-          min = 0,
-          max = 8,
-          warp = 'lin',
-          step = 0.01,
-          default = 1,
-          units = 'v',
-          quantum = 0.01/8,
-          wrap = false
-      },
-    formatter=function(param) return string.format("%.2f", param:get()) end,
-    action=function(x) crow.ii.txo.cv(3, x) end
-  }
-  -- params_3u_patch[txo_level_voice_3.id] = txo_level_voice_3
-  table.insert(params_3u_patch, txo_level_voice_3)
-  params:add(txo_level_voice_3)
+      if z == 1 then
+        params:lookup_param(show_id).name = "▼ "..base_name
+        params:show(base_id.."_shape")
+        params:show(base_id.."_level")
+        params:show(base_id.."_attack")
+        params:show(base_id.."_decay")
+        _menu.rebuild_params()
+      else
+        params:lookup_param(show_id).name = "▶ "..base_name
+        params:hide(base_id.."_shape")
+        params:hide(base_id.."_level")
+        params:hide(base_id.."_attack")
+        params:hide(base_id.."_decay")
+        _menu.rebuild_params()
+      end
+    end
+  end
 
-  local txo_attack_voice_3 = {
-    id="txo_attack_voice_3",
-    name="txo attack - voice 3",
-    type="control",
-    controlspec=controlspec.def{
-          min = 1,
-          max = 5000,
-          warp = 'exp',
-          step = 1,
-          default = 40,
-          units = 'mv',
-          quantum = 0.002,
-          wrap = false
-      },
-    -- formatter=function(param) return param:get() end,
-    action=function(x) crow.ii.txo.env_att(3, x) end
-  }
-  -- params_3u_patch[txo_attack_voice_3.id] = txo_attack_voice_3
-  table.insert(params_3u_patch, txo_attack_voice_3)
-  params:add(txo_attack_voice_3)
+  function make_txo_voice_level_func(port)
+    return function(x)
+      crow.ii.txo.cv(port, x)
+    end
+  end
 
-  local txo_decay_voice_3 = {
-    id="txo_decay_voice_3",
-    name="txo decay - voice 3",
-    type="control",
-    controlspec=controlspec.def{
-          min = 1,
-          max = 10000,
-          warp = 'exp',
-          step = 1,
-          default = 2000,
-          units = 'mv',
-          quantum = 0.002,
-          wrap = false
-      },
-    -- formatter=function(param) return param:get() end,
-    action=function(x) crow.ii.txo.env_dec(3, x) end
-  }
-  -- params_3u_patch[txo_decay_voice_3.id] = txo_decay_voice_3
-  table.insert(params_3u_patch, txo_decay_voice_3)
-  params:add(txo_decay_voice_3)
+  function make_txo_voice_attack_func(port)
+    return function(x)
+      crow.ii.txo.env_att(port, x)
+    end
+  end
 
-  local txo_waveshape_voice_4 = {
-    id="txo_waveshape_voice_4",
-    name="txo waveshape - voice 4",
-    type="number",
-    min=0,
-    max=4500,
-    default=0,
-    action=function(x) crow.ii.txo.osc_wave(4, x) end
-  }
-  -- params_3u_patch[txo_waveshape_voice_4.id] = txo_waveshape_voice_4
-  table.insert(params_3u_patch, txo_waveshape_voice_4)
-  params:add(txo_waveshape_voice_4)
+  function make_txo_voice_decay_func(port)
+    return function(x)
+      crow.ii.txo.env_dec(port, x)
+    end
+  end
 
-  local txo_level_voice_4 = {
-    id="txo_level_voice_4",
-    name="txo level - voice 4",
-    type="control",
-    controlspec=controlspec.def{
-          min = 0,
-          max = 8,
-          warp = 'lin',
-          step = 0.01,
-          default = 1,
-          units = 'v',
-          quantum = 0.01/8,
-          wrap = false
-      },
-    formatter=function(param) return string.format("%.2f", param:get()) end,
-    action=function(x) crow.ii.txo.cv(4, x) end
-  }
-  -- params_3u_patch[txo_level_voice_4.id] = txo_level_voice_4
-  table.insert(params_3u_patch, txo_level_voice_4)
-  params:add(txo_level_voice_4)
+  function make_txo_voice_shape_func(port)
+    return function(x)
+      crow.ii.txo.osc_wave(port, x)
+    end
+  end
 
-  local txo_attack_voice_4 = {
-    id="txo_attack_voice_4",
-    name="txo attack - voice 4",
-    type="control",
-    controlspec=controlspec.def{
-          min = 1,
-          max = 5000,
-          warp = 'exp',
-          step = 1,
-          default = 40,
-          units = 'mv',
-          quantum = 0.002,
-          wrap = false
-      },
-    -- formatter=function(param) return param:get() end,
-    action=function(x) crow.ii.txo.env_att(4, x) end
-  }
-  -- params_3u_patch[txo_attack_voice_4.id] = txo_attack_voice_4
-  table.insert(params_3u_patch, txo_attack_voice_4)
-  params:add(txo_attack_voice_4)
+  for i=1,4 do
+    local base_id = "txo_voice_"..i
+    local show_id = base_id.."_show"
+    local base_name = "txo voice "..i
 
-  local txo_decay_voice_4 = {
-    id="txo_decay_voice_4",
-    name="txo decay - voice 4",
-    type="control",
-    controlspec=controlspec.def{
-          min = 1,
-          max = 10000,
-          warp = 'exp',
-          step = 1,
-          default = 2000,
-          units = 'mv',
-          quantum = 0.002,
-          wrap = false
-      },
-    -- formatter=function(param) return param:get() end,
-    action=function(x) crow.ii.txo.env_dec(4, x) end
-  }
-  -- params_3u_patch[txo_decay_voice_4.id] = txo_decay_voice_4
-  table.insert(params_3u_patch, txo_decay_voice_4)
-  params:add(txo_decay_voice_4)
+    local show_param = {
+      id=show_id,
+      name="▶ "..base_name,
+      type="binary",
+      behavior="toggle",
+      default=0,
+      action=make_txo_voice_show_function(i)
+    }
+    if i == 2 or i == 4 then
+      show_param.default = 1
+    end
+    -- table.insert(params_3u_patch, show_param)
+    params:add(show_param)
+
+    shape_param = {
+      id=base_id.."_shape",
+      name=base_name.." shape",
+      type="number",
+      min=0,
+      max=4500,
+      default=0,
+      action=make_txo_voice_shape_func(i)
+    }
+    table.insert(params_3u_patch, shape_param)
+    params:add(shape_param)
+    if params:get(show_id) == 0 then
+      params:hide(base_id.."_shape")
+      _menu.rebuild_params()
+    end
+
+    local level_param = {
+      id=base_id.."_level",
+      name=base_name.." level",
+      -- type="number",
+      -- min=0,
+      -- max=4500,
+      -- default=0,
+      type="control",
+      controlspec=controlspec.def{
+            min = 0,
+            max = 8,
+            warp = 'lin',
+            step = 0.01,
+            default = 1,
+            units = 'v',
+            quantum = 0.01/8,
+            wrap = false
+        },
+      -- formatter=function(param) return string.format("%.2f", param:get()) end,
+      action=make_txo_voice_level_func(i)
+    }
+    table.insert(params_3u_patch, level_param)
+    params:add(level_param)
+    if params:get(show_id) == 0 then
+        params:hide(base_id.."_level")
+        _menu.rebuild_params()
+    end
+
+    local attack_param = {
+      id=base_id.."_attack",
+      name=base_name.." attack",
+      type="control",
+      controlspec=controlspec.def{
+            min = 1,
+            max = 5000,
+            warp = 'exp',
+            step = 1,
+            default = 40,
+            units = 'mv',
+            quantum = 0.002,
+            wrap = false
+        },
+      -- formatter=function(param) return param:get() end,
+      action=make_txo_voice_attack_func(i)
+    }
+    table.insert(params_3u_patch, attack_param)
+    params:add(attack_param)
+    if params:get(show_id) == 0 then
+      params:hide(base_id.."_attack")
+      _menu.rebuild_params()
+    end
+
+    local decay_param = {
+      id=base_id.."_decay",
+      name=base_name.." decay",
+      type="control",
+      controlspec=controlspec.def{
+            min = 1,
+            max = 10000,
+            warp = 'exp',
+            step = 1,
+            default = 2000,
+            units = 'mv',
+            quantum = 0.002,
+            wrap = false
+        },
+      -- formatter=function(param) return param:get() end,
+      action=make_txo_voice_decay_func(i)
+    }
+    table.insert(params_3u_patch, decay_param)
+    params:add(decay_param)
+    if params:get(show_id) == 0 then
+      params:hide(base_id.."_decay")
+      _menu.rebuild_params()
+    end
+  end
 
   local crow_ins_to_wsyn = {
     id="crow_ins_to_wsyn",
