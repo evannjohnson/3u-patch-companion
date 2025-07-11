@@ -623,10 +623,16 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
     shape_param = {
       id=base_id.."_shape",
       name=base_name.." shape",
-      type="number",
-      min=0,
-      max=4500,
-      default=0,
+      type="control",
+      controlspec=controlspec.def{
+        min = 0,
+        max = 5000,
+        step = 10,
+        default = 0,
+        units = 'mv',
+        quantum = 1/500,
+        wrap = false
+      },
       action=make_txo_voice_shape_func(i)
     }
     table.insert(params_3u_patch, shape_param)
