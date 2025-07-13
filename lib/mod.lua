@@ -19,7 +19,7 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
   -- paste the following into kakoune prompt to get number of params
   -- actually doesn't work anymore since i'm creating some params programmatically
   -- exec \%sparams:add\(<ret>:echo<space>%val{selection_count}<ret>
-  params:add_group("3u_patch_params", "3U PATCH", 61)
+  params:add_group("3u_patch_params", "3U PATCH", 65)
 
   -- allows keys and encoders to be mapped to nothing
   local empty_param = {
@@ -807,8 +807,29 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
     type="option",
     options=key_options,
     default = pfuncs.get_index_of_value(key_options, "none"),
+    action = function(v)
+      if v == 1 then -- option 'none'
+        params:set("k2_propagate", 1)
+        params:hide("k2_propagate")
+      else
+        params:show("k2_propagate")
+      end
+      _menu.rebuild_params()
+    end
   }
   params:add(k2_action)
+  local k2_propagate = {
+    id="k2_propagate",
+    name="k2 propagate",
+    type="binary",
+    behavior="toggle",
+    default=1,
+  }
+  params:add(k2_propagate)
+  if params:get("k2_action") == 1 then
+      params:hide("k2_propagate")
+      _menu.rebuild_params()
+  end
 
   local k3_action = {
     id="k3_action",
@@ -816,8 +837,29 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
     type="option",
     options=key_options,
     default = pfuncs.get_index_of_value(key_options, "none"),
+    action = function(v)
+      if v == 1 then -- option 'none'
+        params:set("k3_propagate", 1)
+        params:hide("k3_propagate")
+      else
+        params:show("k3_propagate")
+      end
+      _menu.rebuild_params()
+    end
   }
   params:add(k3_action)
+  local k3_propagate = {
+    id="k3_propagate",
+    name="k3 propagate",
+    type="binary",
+    behavior="toggle",
+    default=1,
+  }
+  params:add(k3_propagate)
+  if params:get("k3_action") == 1 then
+      params:hide("k3_propagate")
+      _menu.rebuild_params()
+  end
 
   local e1_action = {
     id="e1_action",
@@ -825,8 +867,29 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
     type="option",
     options=enc_options,
     default = pfuncs.get_index_of_value(enc_options, "none"),
+    action = function(v)
+      if v == 1 then -- option 'none'
+        params:set("e1_propagate", 1)
+        params:hide("e1_propagate")
+      else
+        params:show("e1_propagate")
+      end
+      _menu.rebuild_params()
+    end
   }
   params:add(e1_action)
+  local e1_propagate = {
+    id="e1_propagate",
+    name="e1 propagate",
+    type="binary",
+    behavior="toggle",
+    default=1,
+  }
+  params:add(e1_propagate)
+  if params:get("e1_action") == 1 then
+      params:hide("e1_propagate")
+      _menu.rebuild_params()
+  end
 
   local e2_action = {
     id="e2_action",
@@ -834,8 +897,29 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
     type="option",
     options=enc_options,
     default = pfuncs.get_index_of_value(enc_options, "none"),
+    action = function(v)
+      if v == 1 then -- option 'none'
+        params:set("e2_propagate", 1)
+        params:hide("e2_propagate")
+      else
+        params:show("e2_propagate")
+      end
+      _menu.rebuild_params()
+    end
   }
   params:add(e2_action)
+  local e2_propagate = {
+    id="e2_propagate",
+    name="e2 propagate",
+    type="binary",
+    behavior="toggle",
+    default=1,
+  }
+  params:add(e2_propagate)
+  if params:get("e2_action") == 1 then
+      params:hide("e2_propagate")
+      _menu.rebuild_params()
+  end
 
   local e3_action = {
     id="e3_action",
@@ -843,8 +927,30 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
     type="option",
     options=enc_options,
     default = pfuncs.get_index_of_value(enc_options, "none"),
+    action = function(v)
+      if v == 1 then -- option 'none'
+        params:set("e3_propagate", 1)
+        params:hide("e3_propagate")
+      else
+        params:show("e3_propagate")
+      end
+      _menu.rebuild_params()
+    end
   }
   params:add(e3_action)
+
+  local e3_propagate = {
+    id="e3_propagate",
+    name="e3 propagate",
+    type="binary",
+    behavior="toggle",
+    default=1,
+  }
+  params:add(e3_propagate)
+  if params:get("e3_action") == 1 then
+      params:hide("e3_propagate")
+      _menu.rebuild_params()
+  end
 
   local draw_changes = {
     id="draw_changes",
@@ -876,7 +982,9 @@ mod.hook.register("script_post_init", "3u patch companion post init", function()
       end
     end
 
-    key_wrapped(n, z)
+    if params:get("k"..n.."_propagate") == 1 then
+      key_wrapped(n, z)
+    end
   end
 
   enc_wrapped = enc
@@ -884,7 +992,9 @@ mod.hook.register("script_post_init", "3u patch companion post init", function()
     local id = enc_option_to_id[enc_options[params:get("e"..n.."_action")]]
     params:delta(id, delta)
 
-    enc_wrapped(n, delta)
+    if params:get("e"..n.."_propagate") == 1 then
+      enc_wrapped(n, delta)
+    end
   end
 
   function trackball_input(typ, code, val)
