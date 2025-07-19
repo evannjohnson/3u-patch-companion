@@ -970,6 +970,11 @@ mod.hook.register("script_post_init", "3u patch companion post init", function()
 
   key_wrapped = key
   function key(n, z)
+    if n == 1 then
+      key_wrapped(n,z)
+      return
+    end
+
     local id = key_option_to_id[key_options[params:get("k"..n.."_action")]]
     if (id ~= 'empty_param') then
       local behavior = params:lookup_param(id).behavior
