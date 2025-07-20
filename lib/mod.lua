@@ -23,9 +23,11 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
 
   -- allows keys and encoders to be mapped to nothing
   local empty_param = {
-    id="empty_param",
+    id="empty_param_3u",
     name="none",
     type="number",
+    min=0,
+    max=0
   }
   table.insert(mappable_params_3u, empty_param)
   params:add(empty_param)
@@ -721,15 +723,15 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
   params:add(crow_ins_to_wsyn)
 
   -- create key and encoder action params
-  key_options = {}
-  key_option_to_id = {}
-  enc_options = {}
-  enc_option_to_id = {}
-  trackball_options = {}
-  trackball_option_to_id = {}
+  key_options_3u = {}
+  key_option_to_id_3u = {}
+  enc_options_3u = {}
+  enc_option_to_id_3u = {}
+  trackball_options_3u = {}
+  trackball_option_to_id_3u = {}
 
-  table.insert(key_options, "none")
-  key_option_to_id["none"] = "empty_param"
+  table.insert(key_options_3u, "none")
+  key_option_to_id_3u["none"] = "empty_param"
   -- table.insert(enc_options, "none")
   -- enc_option_to_id["none"] = "empty_param"
   -- table.insert(trackball_options, "none")
@@ -737,13 +739,13 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
 
   for i,p in ipairs(mappable_params_3u) do
     if p.type == "binary" then
-      table.insert(key_options, p.name)
-      key_option_to_id[p.name] = p.id
+      table.insert(key_options_3u, p.name)
+      key_option_to_id_3u[p.name] = p.id
     elseif p.type == "number" or p.type == "control" then
-      table.insert(enc_options, p.name)
-      enc_option_to_id[p.name] = p.id
-      table.insert(trackball_options, p.name)
-      trackball_option_to_id[p.name] = p.id
+      table.insert(enc_options_3u, p.name)
+      enc_option_to_id_3u[p.name] = p.id
+      table.insert(trackball_options_3u, p.name)
+      trackball_option_to_id_3u[p.name] = p.id
     end
   end
 
@@ -751,8 +753,8 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
     id="trackball_x_action",
     name="ball x",
     type="option",
-    options=trackball_options,
-    default = pfuncs.get_index_of_value(trackball_options, "wsyn fm index"),
+    options=trackball_options_3u,
+    default = pfuncs.get_index_of_value(trackball_options_3u, "wsyn fm index"),
   }
   params:add(trackball_x_action)
 
@@ -760,8 +762,8 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
     id="trackball_y_action",
     name="ball y",
     type="option",
-    options=trackball_options,
-    default = pfuncs.get_index_of_value(trackball_options, "wsyn lpg time"),
+    options=trackball_options_3u,
+    default = pfuncs.get_index_of_value(trackball_options_3u, "wsyn lpg time"),
   }
   params:add(trackball_y_action)
 
@@ -769,8 +771,8 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
     id="trackball_scroll_action",
     name="ball scroll",
     type="option",
-    options=trackball_options,
-    default = pfuncs.get_index_of_value(trackball_options, "wsyn fm ratio"),
+    options=trackball_options_3u,
+    default = pfuncs.get_index_of_value(trackball_options_3u, "wsyn fm ratio"),
   }
   params:add(trackball_scroll_action)
 
@@ -802,153 +804,153 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
   params:add(trackball_scroll_invert)
 
   local k2_action = {
-    id="k2_action",
+    id="k2_action_3u",
     name="k2",
     type="option",
-    options=key_options,
-    default = pfuncs.get_index_of_value(key_options, "none"),
+    options=key_options_3u,
+    default = pfuncs.get_index_of_value(key_options_3u, "none"),
     action = function(v)
       if v == 1 then -- option 'none'
-        params:set("k2_propagate", 1)
-        params:hide("k2_propagate")
+        params:set("k2_propagate_3u", 1)
+        params:hide("k2_propagate_3u")
       else
-        params:show("k2_propagate")
+        params:show("k2_propagate_3u")
       end
       _menu.rebuild_params()
     end
   }
   params:add(k2_action)
-  local k2_propagate = {
-    id="k2_propagate",
+  local k2_propagate_3u = {
+    id="k2_propagate_3u",
     name="k2 propagate",
     type="binary",
     behavior="toggle",
     default=1,
   }
-  params:add(k2_propagate)
-  if params:get("k2_action") == 1 then
-      params:hide("k2_propagate")
+  params:add(k2_propagate_3u)
+  if params:get("k2_action_3u") == 1 then
+      params:hide("k2_propagate_3u")
       _menu.rebuild_params()
   end
 
   local k3_action = {
-    id="k3_action",
+    id="k3_action_3u",
     name="k3",
     type="option",
-    options=key_options,
-    default = pfuncs.get_index_of_value(key_options, "none"),
+    options=key_options_3u,
+    default = pfuncs.get_index_of_value(key_options_3u, "none"),
     action = function(v)
       if v == 1 then -- option 'none'
-        params:set("k3_propagate", 1)
-        params:hide("k3_propagate")
+        params:set("k3_propagate_3u", 1)
+        params:hide("k3_propagate_3u")
       else
-        params:show("k3_propagate")
+        params:show("k3_propagate_3u")
       end
       _menu.rebuild_params()
     end
   }
   params:add(k3_action)
-  local k3_propagate = {
-    id="k3_propagate",
+  local k3_propagate_3u = {
+    id="k3_propagate_3u",
     name="k3 propagate",
     type="binary",
     behavior="toggle",
     default=1,
   }
-  params:add(k3_propagate)
-  if params:get("k3_action") == 1 then
-      params:hide("k3_propagate")
+  params:add(k3_propagate_3u)
+  if params:get("k3_action_3u") == 1 then
+      params:hide("k3_propagate_3u")
       _menu.rebuild_params()
   end
 
   local e1_action = {
-    id="e1_action",
+    id="3u_e1_action",
     name="e1",
     type="option",
-    options=enc_options,
-    default = pfuncs.get_index_of_value(enc_options, "none"),
+    options=enc_options_3u,
+    default = pfuncs.get_index_of_value(enc_options_3u, "none"),
     action = function(v)
       if v == 1 then -- option 'none'
-        params:set("e1_propagate", 1)
-        params:hide("e1_propagate")
+        params:set("e1_propagate_3u", 1)
+        params:hide("e1_propagate_3u")
       else
-        params:show("e1_propagate")
+        params:show("e1_propagate_3u")
       end
       _menu.rebuild_params()
     end
   }
   params:add(e1_action)
-  local e1_propagate = {
-    id="e1_propagate",
+  local e1_propagate_3u = {
+    id="e1_propagate_3u",
     name="e1 propagate",
     type="binary",
     behavior="toggle",
     default=1,
   }
-  params:add(e1_propagate)
-  if params:get("e1_action") == 1 then
-      params:hide("e1_propagate")
+  params:add(e1_propagate_3u)
+  if params:get("3u_e1_action") == 1 then
+      params:hide("e1_propagate_3u")
       _menu.rebuild_params()
   end
 
   local e2_action = {
-    id="e2_action",
+    id="e2_action_3u",
     name="e2",
     type="option",
-    options=enc_options,
-    default = pfuncs.get_index_of_value(enc_options, "none"),
+    options=enc_options_3u,
+    default = pfuncs.get_index_of_value(enc_options_3u, "none"),
     action = function(v)
       if v == 1 then -- option 'none'
-        params:set("e2_propagate", 1)
-        params:hide("e2_propagate")
+        params:set("e2_propagate_3u", 1)
+        params:hide("e2_propagate_3u")
       else
-        params:show("e2_propagate")
+        params:show("e2_propagate_3u")
       end
       _menu.rebuild_params()
     end
   }
   params:add(e2_action)
-  local e2_propagate = {
-    id="e2_propagate",
+  local e2_propagate_3u = {
+    id="e2_propagate_3u",
     name="e2 propagate",
     type="binary",
     behavior="toggle",
     default=1,
   }
-  params:add(e2_propagate)
-  if params:get("e2_action") == 1 then
-      params:hide("e2_propagate")
+  params:add(e2_propagate_3u)
+  if params:get("e2_action_3u") == 1 then
+      params:hide("e2_propagate_3u")
       _menu.rebuild_params()
   end
 
   local e3_action = {
-    id="e3_action",
+    id="e3_action_3u",
     name="e3",
     type="option",
-    options=enc_options,
-    default = pfuncs.get_index_of_value(enc_options, "none"),
+    options=enc_options_3u,
+    default = pfuncs.get_index_of_value(enc_options_3u, "none"),
     action = function(v)
       if v == 1 then -- option 'none'
-        params:set("e3_propagate", 1)
-        params:hide("e3_propagate")
+        params:set("e3_propagate_3u", 1)
+        params:hide("e3_propagate_3u")
       else
-        params:show("e3_propagate")
+        params:show("e3_propagate_3u")
       end
       _menu.rebuild_params()
     end
   }
   params:add(e3_action)
 
-  local e3_propagate = {
-    id="e3_propagate",
+  local e3_propagate_3u = {
+    id="e3_propagate_3u",
     name="e3 propagate",
     type="binary",
     behavior="toggle",
     default=1,
   }
-  params:add(e3_propagate)
-  if params:get("e3_action") == 1 then
-      params:hide("e3_propagate")
+  params:add(e3_propagate_3u)
+  if params:get("e3_action_3u") == 1 then
+      params:hide("e3_propagate_3u")
       _menu.rebuild_params()
   end
 
@@ -975,8 +977,8 @@ mod.hook.register("script_post_init", "3u patch companion post init", function()
       return
     end
 
-    local id = key_option_to_id[key_options[params:get("k"..n.."_action")]]
-    if (id ~= 'empty_param') then
+    local id = key_option_to_id_3u[key_options_3u[params:get("k"..n.."_action_3u")]]
+    if (id ~= 'empty_param_3u') then
       local behavior = params:lookup_param(id).behavior
       if behavior == "toggle" and z == 1 then
         params:set(id, 1 - params:get(id))
@@ -987,17 +989,17 @@ mod.hook.register("script_post_init", "3u patch companion post init", function()
       end
     end
 
-    if params:get("k"..n.."_propagate") == 1 then
+    if params:get("k"..n.."_propagate_3u") == 1 then
       key_wrapped(n, z)
     end
   end
 
   enc_wrapped = enc
   function enc(n, delta)
-    local id = enc_option_to_id[enc_options[params:get("e"..n.."_action")]]
+    local id = enc_option_to_id_3u[enc_options_3u[params:get("e"..n.."_action_3u")]]
     params:delta(id, delta)
 
-    if params:get("e"..n.."_propagate") == 1 then
+    if params:get("e"..n.."_propagate_3u") == 1 then
       enc_wrapped(n, delta)
     end
   end
@@ -1005,17 +1007,17 @@ mod.hook.register("script_post_init", "3u patch companion post init", function()
   function trackball_input(typ, code, val)
     local param_id
     if code == 0x00 then -- hid_events.codes.REL_X = 0x00
-      param_id = trackball_option_to_id[trackball_options[params:get("trackball_x_action")]]
+      param_id = trackball_option_to_id_3u[trackball_options_3u[params:get("trackball_x_action")]]
       if (params:get("trackball_x_invert") == 1) then
         val = -val
       end
     elseif code == 0x01 then -- hid_events.codes.REL_Y = 0x01
-      param_id = trackball_option_to_id[trackball_options[params:get("trackball_y_action")]]
+      param_id = trackball_option_to_id_3u[trackball_options_3u[params:get("trackball_y_action")]]
       if (params:get("trackball_y_invert") == 1) then
         val = -val
       end
     elseif code == 0x08 then -- hid_events.codes.REL_WHEEL = 0x08
-      param_id = trackball_option_to_id[trackball_options[params:get("trackball_scroll_action")]]
+      param_id = trackball_option_to_id_3u[trackball_options_3u[params:get("trackball_scroll_action")]]
       if (params:get("trackball_scroll_invert") == 1) then
         val = -val
       end
