@@ -17,9 +17,9 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
   mappable_params_3u = {}
 
   -- paste the following into kakoune prompt to get number of params
-  -- actually doesn't work anymore since i'm creating some params programmatically
+  -- doesn't work anymore since i'm creating some params programmatically
   -- exec \%sparams:add\(<ret>:echo<space>%val{selection_count}<ret>
-  params:add_group("3u_patch_params", "3U PATCH", 65)
+  params:add_group("3u_patch_params", "3U PATCH", 66)
 
   -- allows keys and encoders to be mapped to nothing
   local empty_param = {
@@ -55,30 +55,84 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
   }
   params:add(bang_params)
 
-  function update_txo_clocks()
+  function update_txo_clocks(beat_sec)
     for i=1,4 do
       local base_id = "clock_txo_tr_"..i
       if params:get(base_id) == 1 then
-        crow.ii.txo.tr_m(i, clock.get_beat_sec() * 1000 / params:get(base_id.."_div"))
+        local m = beat_sec * 1000 / params:get(base_id.."_div")
+        crow.ii.txo.tr_m(i, m)
       end
     end
   end
+
+  -- clock division at which to sync txo metronome
+  -- enables runtime control
+  -- for smaller division at lower clock speeds where drift was an issue
+  -- integer, bigger = faster, ex. 16 is clock.sync(1/16)
+  txo_m_sync_div_3u = 1
 
   -- these clock params just expose relevant clock params next to the other params
   local clock_bpm = {
     id="clock_bpm",
     name="clock bpm",
-    type="number",
-    min=1,
-    max=300,
-    default=params:get("clock_tempo"),
+    type="control",
+    controlspec=controlspec.def{
+      min = 1,
+      max = 600,
+      warp = 'exp',
+      step = 0.1,
+      default = norns.state.clock.tempo,
+      quantum = 0.2/599,
+      wrap = false
+    },
     action=function(x)
       params:set("clock_tempo", x)
-      update_txo_clocks()
+      -- must calculate manually because clock.get_beat_sec() doesn't update immediately
+      local beat_sec = 60.0 / x
+      local sync_sec = clock.get_beat_sec() / txo_m_sync_div_3u
+      if sync_sec > 1 then
+        txo_m_sync_div_3u = txo_m_sync_div_3u * 2
+      elseif sync_sec < 0.5 then
+        txo_m_sync_div_3u = txo_m_sync_div_3u / 2
+      end
+      update_txo_clocks(beat_sec)
     end
   }
   table.insert(mappable_params_3u, clock_bpm)
   params:add(clock_bpm)
+
+  local clock_bpm_x2 = {
+    id="clock_bpm_x2",
+    name="clock bpm x2",
+    type="control",
+    controlspec=controlspec.def{
+      min = 1,
+      max = 600,
+      warp = 'lin',
+      step = 0.1,
+      default = norns.state.clock.tempo,
+      quantum = 0.1/599,
+      wrap = false
+    },
+    formatter=function(val)
+      local bpm = params:get("clock_tempo")
+      params:set("clock_bpm_x2", bpm)
+      return bpm
+    end,
+    action=function(x)
+      local bpm = params:get("clock_tempo")
+      if x < bpm then
+        bpm = bpm / 2
+        params:set("clock_bpm", bpm)
+        params:set("clock_bpm_x2", bpm)
+      elseif x > bpm then -- increase
+        bpm = bpm * 2
+        params:set("clock_bpm", bpm)
+        params:set("clock_bpm_x2", bpm)
+      end
+    end
+  }
+  params:add(clock_bpm_x2)
 
   function make_txo_m_toggle_func(port)
     return function(z)
@@ -93,7 +147,9 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
         if (not clock_txo_m_id) then
           clock_txo_m_id = clock.run(function()
             while true do
-              clock.sync(1)
+              clock.sync(1/txo_m_sync_div_3u)
+              -- crow.output[2].volts = 6
+              -- crow.output[2].volts = 0
               crow.ii.txo.m_sync(1)
             end
           end)
