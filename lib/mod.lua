@@ -85,6 +85,10 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
       quantum = 0.2/599,
       wrap = false
     },
+    formatter=function(param)
+      local bpm = param:get()
+      return string.format("%.1f ◀ %.1f ▶ %.1f", bpm / 2, bpm, bpm * 2)
+    end,
     action=function(x)
       params:set("clock_tempo", x)
       -- must calculate manually because clock.get_beat_sec() doesn't update immediately
