@@ -212,7 +212,7 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
       name=base_name.." div",
       type="number",
       min=1,
-      max=32,
+      max=128,
       default=16,
       action=make_txo_m_div_func(i)
     }
@@ -228,7 +228,7 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
       name=base_name.." div x2",
       type="number",
       min=1,
-      max=32,
+      max=128,
       default=params:get(div_id),
       formatter=function(val)
         local div = params:get(div_id)
@@ -240,12 +240,12 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
         -- decrease
         if x < div then
           div = math.floor(div/2)
-          div = math.max(1, math.min(32, div))
+          div = math.max(1, math.min(128, div))
           params:set(div_id, div)
           params:set(div_id.."_x2", div)
         elseif x > div then -- increase
           div = div*2
-          div = math.max(1, math.min(32, div))
+          div = math.max(1, math.min(128, div))
           params:set(div_id, div)
           params:set(div_id.."_x2", div)
         end
@@ -264,7 +264,7 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
     id="txo_cv_3_oct",
     name="txo cv 3 oct",
     type="number",
-    min=-5,
+    min=-3,
     max=5,
     default=0,
     action=function(x)
