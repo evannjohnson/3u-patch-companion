@@ -19,7 +19,7 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
   -- paste the following into kakoune prompt to get number of params
   -- doesn't work anymore since i'm creating some params programmatically
   -- exec \%sparams:add\(<ret>:echo<space>%val{selection_count}<ret>
-  params:add_group("3u_patch_params", "3U PATCH", 66)
+  params:add_group("3u_patch_params", "3U PATCH", 75)
 
   -- allows keys and encoders to be mapped to nothing
   local empty_param = {
@@ -390,6 +390,327 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
   params:add(txo_cv_3_oct_delta)
   params:hide("txo_cv_3_oct_delta")
   _menu.rebuild_params()
+
+  local crow_env_active = {
+    id="crow_env_active",
+    name="○ crow env",
+    type="binary",
+    behavior="toggle",
+    default=1,
+    action= function(state)
+      -- prevent the env params from attempting to set crow public var before they are available
+      crow_env_init_3u = false
+
+      -- local function for clock.run
+      local function dofunc(z)
+        if z == 1 then
+        -- if z == 1 and not crow_env_init_3u then
+          norns.crow.loadscript("3u-patch-companion/crow/env-public-vars.lua")
+          -- loadscript is async, and takes time run
+          -- we need to ensure the load is finished before continuing
+          -- TODO: find out how to make loadscript synchronous
+          clock.sleep(1)
+          -- script is loaded, allow env params to set public vars
+          crow_env_init_3u = true
+
+          local out = params:get("crow_env_out")
+          local input = params:get("crow_env_in")
+          local amp = params:get("crow_env_amp")
+          local retrig = params:string("crow_env_retrig_behavior")
+          local len = params:get("crow_env_time")
+          local ratio = params:get("crow_env_ratio")
+          local rise = len * ratio
+          local fall = len * (1 - ratio)
+          local rise_shape = params:string("crow_env_rise_shape")
+          local fall_shape = params:string("crow_env_fall_shape")
+          local start_stage = ""
+
+          crow.public.envout = out
+
+          if retrig == "from zero" then
+            start_stage="to(0, 0),"
+          end
+
+          crow.output[out].action = "{ "..start_stage.."to(dyn{amp="..amp.."}, dyn{rise="..rise.."}, '"..rise_shape.."'), to(0, dyn{fall="..fall.."}, '"..fall_shape.."') }"
+
+          crow.output[out].done = function()
+            crow.public.envactive = 0
+          end
+
+          crow.input[input].mode('change', 1, 0.1, 'rising')
+
+          if retrig == "no retrig" then
+            crow.input[input].change = function()
+              if crow.public.envactive == 0 then
+                crow.public.envactive = 1
+                crow.output[crow.public.envout]()
+              end
+            end
+          else
+            crow.input[input].change = function()
+              crow.public.envactive = 1
+              crow.output[crow.public.envout]()
+            end
+          end
+
+          params:lookup_param("crow_env_active").name = "● crow env"
+          params:show("crow_env_time")
+          params:show("crow_env_ratio")
+          params:show("crow_env_amp")
+          params:show("crow_env_retrig_behavior")
+          params:show("crow_env_in")
+          params:show("crow_env_out")
+          _menu.rebuild_params()
+
+          -- there is some kind of ii init that happens when we do the crow stuff above
+          -- it clears my values for ii devices like wsyn
+          -- need to bang to send the ii messages again
+          for _,p in pairs(params.params) do
+            if string.match(p.id, "^wsyn") or string.match(p.id, "^txo") then
+              p:bang()
+            end
+          end
+        elseif z == 0 then
+          params:lookup_param("crow_env_active").name = "○ crow env"
+          params:hide("crow_env_time")
+          params:hide("crow_env_ratio")
+          params:hide("crow_env_amp")
+          params:hide("crow_env_retrig_behavior")
+          params:hide("crow_env_in")
+          params:hide("crow_env_out")
+          _menu.rebuild_params()
+        end
+      end
+
+      clock.run(dofunc, state)
+    end
+  }
+  params:add(crow_env_active)
+
+  local crow_env_time = {
+    id="crow_env_time",
+    name="crow env time",
+    type="control",
+    controlspec=controlspec.def{
+      min = 0.01,
+      max = 4,
+      warp = 'exp',
+      step = 0.01,
+      default = 2,
+      quantum = 0.01/(4-0.01),
+      wrap = false
+    },
+    action=function(len)
+      if crow_env_init_3u then
+        local rise = len * params:get("crow_env_ratio")
+        local fall = len * (1 - params:get("crow_env_ratio"))
+        local out = params:get("crow_env_out")
+        crow.output[out].dyn.rise = rise
+        crow.output[out].dyn.fall = fall
+      end
+    end
+  }
+  params:add(crow_env_time)
+  if params:get("crow_env_active") == 0 then
+    params:hide(crow_env_time)
+    _menu.rebuild_params()
+  end
+
+  local crow_env_ratio = {
+    id="crow_env_ratio",
+    name="crow env ratio",
+    type="control",
+    controlspec=controlspec.def{
+      min = 0,
+      max = 1,
+      warp = 'lin',
+      step = 0.01,
+      default = 0.1,
+      quantum = 0.01,
+      wrap = false
+    },
+    action=function(ratio)
+      if crow_env_init_3u then
+        local rise = params:get("crow_env_time") * ratio
+        local fall = params:get("crow_env_time") * (1 - ratio)
+        local out = params:get("crow_env_out")
+        crow.output[out].dyn.rise = rise
+        crow.output[out].dyn.fall = fall
+      end
+    end
+  }
+  params:add(crow_env_ratio)
+  if params:get("crow_env_active") == 0 then
+    params:hide("crow_env_ratio")
+    _menu.rebuild_params()
+  end
+
+  local crow_env_amp = {
+    id="crow_env_amp",
+    name="crow env amp",
+    type="control",
+    controlspec=controlspec.def{
+      min = -5,
+      max = 10,
+      warp = 'lin',
+      step = 0.1,
+      default = 8,
+      quantum = 0.1/15,
+      wrap = false
+    },
+    action=function(amp)
+      if crow_env_init_3u then
+        local out = params:get("crow_env_out")
+        crow.output[out].dyn.amp = amp
+      end
+    end
+  }
+  params:add(crow_env_amp)
+  if params:get("crow_env_active") == 0 then
+    params:hide("crow_env_amp")
+    _menu.rebuild_params()
+  end
+
+  local crow_env_rise_shape = {
+    id="crow_env_rise_shape",
+    name="crow env rise shape",
+    type="option",
+    options={"linear", "exponential", "logarithmic", "sine"},
+    action=function()
+      if crow_env_init_3u then
+        local out = params:get("crow_env_out")
+        local amp = params:get("crow_env_amp")
+        local len = params:get("crow_env_time")
+        local ratio = params:get("crow_env_ratio")
+        local rise = len * ratio
+        local fall = len * (1 - ratio)
+        local rise_shape = params:string("crow_env_rise_shape")
+        local fall_shape = params:string("crow_env_fall_shape")
+        local retrig = params:string("crow_env_retrig_behavior")
+        local start_stage = ""
+
+        if retrig == "from zero" then
+          start_stage="to(0, 0),"
+        end
+
+        crow.output[out].action = "{ "..start_stage.."to(dyn{amp="..amp.."}, dyn{rise="..rise.."}, '"..rise_shape.."'), to(0, dyn{fall="..fall.."}, '"..fall_shape.."') }"
+      end
+    end
+  }
+  params:add(crow_env_rise_shape)
+  if params:get("crow_env_active") == 0 then
+    params:hide("crow_env_rise_shape")
+    _menu.rebuild_params()
+  end
+
+  local crow_env_fall_shape = {
+    id="crow_env_fall_shape",
+    name="crow env fall shape",
+    type="option",
+    options={"linear", "exponential", "logarithmic", "sine"},
+    action=function()
+      if crow_env_init_3u then
+        local out = params:get("crow_env_out")
+        local amp = params:get("crow_env_amp")
+        local len = params:get("crow_env_time")
+        local ratio = params:get("crow_env_ratio")
+        local rise = len * ratio
+        local fall = len * (1 - ratio)
+        local rise_shape = params:string("crow_env_rise_shape")
+        local fall_shape = params:string("crow_env_fall_shape")
+        local retrig = params:string("crow_env_retrig_behavior")
+        local start_stage = ""
+
+        if retrig == "from zero" then
+          start_stage="to(0, 0),"
+        end
+
+        crow.output[out].action = "{ "..start_stage.."to(dyn{amp="..amp.."}, dyn{rise="..rise.."}, '"..rise_shape.."'), to(0, dyn{fall="..fall.."}, '"..fall_shape.."') }"
+      end
+    end
+  }
+  params:add(crow_env_fall_shape)
+  if params:get("crow_env_active") == 0 then
+    params:hide("crow_env_fall_shape")
+    _menu.rebuild_params()
+  end
+
+  local crow_env_retrig_behavior = {
+    id="crow_env_retrig_behavior",
+    name="crow env retrig",
+    type="option",
+    options={"from zero", "from current", "no retrig"},
+    action=function()
+      if crow_env_init_3u then
+        local retrig = params:string("crow_env_retrig_behavior")
+        local out = params:get("crow_env_out")
+        local input = params:get("crow_env_in")
+        local amp = params:get("crow_env_amp")
+        local len = params:get("crow_env_time")
+        local ratio = params:get("crow_env_ratio")
+        local rise = len * ratio
+        local fall = len * (1 - ratio)
+
+        if retrig == "no retrig" then -- no retrig
+          crow.input[input].change = function()
+            if crow.public.envactive == 0 then
+              crow.public.envactive = 1
+              crow.output[crow.public.envout]()
+            end
+          end
+        else
+          local rise_shape = params:string("crow_env_rise_shape")
+          local fall_shape = params:string("crow_env_fall_shape")
+          local start_stage = ""
+
+          -- allow retrig
+          crow.input[input].change = function()
+            crow.public.envactive = 1
+            crow.output[crow.public.envout]()
+          end
+
+          if retrig == "from zero" then -- from current
+            start_stage="to(0, 0),"
+          end
+
+          crow.output[out].action = "{ "..start_stage.."to(dyn{amp="..amp.."}, dyn{rise="..rise.."}, '"..rise_shape.."'), to(0, dyn{fall="..fall.."}, '"..fall_shape.."') }"
+        end
+      end
+    end
+  }
+  params:add(crow_env_retrig_behavior)
+  if params:get("crow_env_active") == 0 then
+    params:hide("crow_env_retrig_behavior")
+    _menu.rebuild_params()
+  end
+
+  local crow_env_in = {
+    id="crow_env_in",
+    name="crow env trig in",
+    type="number",
+    min=1,
+    max=2,
+    default=2,
+  }
+  params:add(crow_env_in)
+  if params:get("crow_env_active") == 0 then
+    params:hide("crow_env_in")
+    _menu.rebuild_params()
+  end
+
+  local crow_env_out = {
+    id="crow_env_out",
+    name="crow env out",
+    type="number",
+    min=1,
+    max=4,
+    default=3,
+  }
+  params:add(crow_env_out)
+  if params:get("crow_env_active") == 0 then
+    params:hide("crow_env_out")
+    _menu.rebuild_params()
+  end
 
   local crow_clock_output_3 = {
     id="crow_clock_output_3",
