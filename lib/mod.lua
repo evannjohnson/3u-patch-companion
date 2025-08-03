@@ -1,4 +1,39 @@
 local mod = require 'core/mods'
+include 'tools/tools'
+
+function tup()
+  include 'tools/tools'
+end
+
+-- local mft -- midi fighter twister midi device
+param_callbacks_3u = {}
+
+params.params_add_saved_by_3u = params.add
+function params:add(p)
+  local p_action_saved = p.action
+
+  if p.action then
+    p.action = function(val)
+      p_action_saved(val)
+
+      for _,func in ipairs(param_callbacks_3u[p.id]) do
+        func(val)
+      end
+    end
+  else
+    p.action = function(val)
+      for _,func in ipairs(param_callbacks_3u[p.id]) do
+        func(val)
+      end
+    end
+  end
+
+  if p.id then
+    param_callbacks_3u[p.id] = {}
+  end
+
+  self:params_add_saved_by_3u(p)
+end
 
 function darken_buffer(buf, level)
   level = level or 1
@@ -1344,6 +1379,98 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
     default=0
   }
   params:add(draw_changes)
+
+  ----- BEGIN MIDI FIGHTER TWISTER (MFT) CONFIG -----
+  -- params:add_separator("mft_settings", "midi fighter twister")
+
+  -- given a "relative" midi msg with a value of 63 or 65, returns -1 or 1
+  -- value returned when passed other messages is undefined
+  local function msg_delta(msg)
+    return (64 - msg.val) * -1
+  end
+
+  -- local mft_port_param = {
+  --   id="mft_port",
+  --   name="port",
+  --   type="number",
+  --   min=0,
+  --   max=16,
+  --   default=1,
+  --   action=function(port)
+  --     if port ~= 0 then
+  --       mft = midi.connect(port)
+  --     end
+  --   end
+  -- }
+  -- params:add(mft_port_param)
+  mft = midi.connect(1)
+  if mft.name ~= "Midi Fighter Twister" then
+    mft = nil
+  end
+
+  -- table of midi cc handlers, hiearchy is ch -> num -> {func = function, state = {}}
+  mft_handlers = {}
+
+  local enc_chan = 1
+  local enc_s_chan = 5 -- "shift" channel when encoder is turned while pressed
+  mft_handlers[enc_chan] = {}
+  mft_handlers[enc_s_chan] = {}
+
+  mft.event = function(data)
+    local msg = midi.to_msg(data)
+
+    local success, handler = pcall(function()
+      return mft_handlers[msg.ch][msg.cc].func
+    end)
+
+    if success and handler then
+      handler(msg)
+    end
+  end
+
+  -- lower right corner, beads octave (txo cv 3)
+  mft_handlers[enc_chan][15] = {}
+  mft_handlers[enc_chan][15].state = {
+    delta = 0
+  }
+  mft_handlers[enc_chan][15].func = function(msg)
+    local s = mft_handlers[enc_chan][15].state
+    local desensitize = 5
+
+    s.delta = s.delta + msg_delta(msg)
+
+    -- if delta reaches the threshold, do param delta and set internal delta to the next "step" (at the edge of range, next to the threshold that was just crossed)
+    if s.delta % desensitize == 0 then
+      if s.delta < 0 then
+        params:delta("txo_cv_3_oct", -1)
+        s.delta = desensitize - 1
+      elseif s.delta > 0 then
+        params:delta("txo_cv_3_oct", 1)
+        s.delta = (desensitize - 1) * -1
+      end
+    end
+  end
+
+  local function update_enc_15_led(oct)
+    local oct_to_cc = {}
+    oct_to_cc[-5] = 0
+    oct_to_cc[-4] = 10
+    oct_to_cc[-3] = 20
+    oct_to_cc[-2] = 40
+    oct_to_cc[-1] = 50
+    oct_to_cc[0] = 63
+    oct_to_cc[1] = 70
+    oct_to_cc[2] = 80
+    oct_to_cc[3] = 100
+    oct_to_cc[4] = 120
+    oct_to_cc[5] = 127
+
+    -- update indicator level for both regular and shift encoder
+    mft:cc(15, oct_to_cc[oct], enc_chan)
+    mft:cc(15, oct_to_cc[oct], enc_s_chan)
+  end
+  table.insert(param_callbacks_3u['txo_cv_3_oct'], update_enc_15_led)
+  ----- END MIDI FIGHTER TWISTER (MFT) CONFIG -----
 
   params:default()
   params:bang()
