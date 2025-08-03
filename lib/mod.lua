@@ -77,12 +77,12 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
     name="clock bpm",
     type="control",
     controlspec=controlspec.def{
-      min = 1,
+      min = 10,
       max = 600,
       warp = 'exp',
       step = 0.1,
       default = norns.state.clock.tempo,
-      quantum = 0.2/599,
+      quantum = 0.2/590,
       wrap = false
     },
     formatter=function(param)
@@ -273,6 +273,7 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
   }
   params:add(txo_cv_3_oct)
 
+  -- this one is for mapping controllers to
   local txo_cv_3_oct_delta = {
     id="txo_cv_3_oct_delta",
     name="txo cv 3 oct",
@@ -1457,4 +1458,3 @@ function restore_redraw(redraw_func)
   end, 1/10)
   redraw_restore_metro:start()
 end
-
