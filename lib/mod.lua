@@ -54,7 +54,7 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
   -- paste the following into kakoune prompt to get number of params
   -- doesn't work anymore since i'm creating some params programmatically
   -- exec \%sparams:add\(<ret>:echo<space>%val{selection_count}<ret>
-  params:add_group("3u_patch_params", "3U PATCH", 75)
+  params:add_group("3u_patch_params", "3U PATCH", 76)
 
   -- allows keys and encoders to be mapped to nothing
   local empty_param = {
@@ -109,15 +109,15 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
   -- these clock params just expose relevant clock params next to the other params
   local clock_bpm = {
     id="clock_bpm",
-    name="clock bpm",
+    name="bpm @",
     type="control",
     controlspec=controlspec.def{
       min = 10,
-      max = 600,
+      max = 640,
       warp = 'exp',
       step = 0.1,
       default = norns.state.clock.tempo,
-      quantum = 0.2/590,
+      quantum = 0.2/630,
       wrap = false
     },
     formatter=function(param)
@@ -140,34 +140,60 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
   table.insert(mappable_params_3u, clock_bpm)
   params:add(clock_bpm)
 
+  -- local clock_bpm_x2 = {
+  --   id="clock_bpm_x2",
+  --   name="clock bpm x2",
+  --   type="control",
+  --   controlspec=controlspec.def{
+  --     min = 1,
+  --     max = 600,
+  --     warp = 'lin',
+  --     step = 0.1,
+  --     default = norns.state.clock.tempo,
+  --     quantum = 0.1/599,
+  --     wrap = false
+  --   },
+  --   formatter=function(val)
+  --     local bpm = params:get("clock_tempo")
+  --     params:set("clock_bpm_x2", bpm)
+  --     return bpm
+  --   end,
+  --   action=function(x)
+  --     local bpm = params:get("clock_tempo")
+  --     if x < bpm then
+  --       bpm = bpm / 2
+  --       params:set("clock_bpm", bpm)
+  --       params:set("clock_bpm_x2", bpm)
+  --     elseif x > bpm then -- increase
+  --       bpm = bpm * 2
+  --       params:set("clock_bpm", bpm)
+  --       params:set("clock_bpm_x2", bpm)
+  --     end
+  --   end
+  -- }
   local clock_bpm_x2 = {
     id="clock_bpm_x2",
-    name="clock bpm x2",
-    type="control",
-    controlspec=controlspec.def{
-      min = 1,
-      max = 600,
-      warp = 'lin',
-      step = 0.1,
-      default = norns.state.clock.tempo,
-      quantum = 0.1/599,
-      wrap = false
-    },
+    name="bpm x2 @",
+    type="number",
+    min=-1,
+    max=1,
+    default=0,
     formatter=function(val)
       local bpm = params:get("clock_tempo")
-      params:set("clock_bpm_x2", bpm)
+      -- params:set("clock_bpm_x2", bpm)
       return bpm
     end,
     action=function(x)
       local bpm = params:get("clock_tempo")
-      if x < bpm then
+
+      if x == -1 then
         bpm = bpm / 2
         params:set("clock_bpm", bpm)
-        params:set("clock_bpm_x2", bpm)
-      elseif x > bpm then -- increase
+        params:set("clock_bpm_x2", 0)
+      elseif x == 1 then
         bpm = bpm * 2
         params:set("clock_bpm", bpm)
-        params:set("clock_bpm_x2", bpm)
+        params:set("clock_bpm_x2", 0)
       end
     end
   }
@@ -1380,13 +1406,47 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
   }
   params:add(draw_changes)
 
+  local mft_animate_param = {
+    id="mft_animate_3u",
+    name="animate MFT",
+    type="binary",
+    behavior="toggle",
+    default=1,
+    action=function(z)
+      if z == 0 then
+        for _,t in pairs(mft_animators) do
+          if t.id then
+            clock.cancel(t.id)
+            t.id = nil
+          end
+        end
+      else
+        for _,t in pairs(mft_animators) do
+          if not t.id then
+            t.id = clock.run(t.func)
+          end
+        end
+      end
+    end
+  }
+  params:add(mft_animate_param)
+
   ----- BEGIN MIDI FIGHTER TWISTER (MFT) CONFIG -----
   -- params:add_separator("mft_settings", "midi fighter twister")
+
+  mft_rgb_brightness_default = 35 -- ~equiv to value 100 in mft brightness config
 
   -- given a "relative" midi msg with a value of 63 or 65, returns -1 or 1
   -- value returned when passed other messages is undefined
   local function msg_delta(msg)
     return (64 - msg.val) * -1
+  end
+
+  -- performing a params:delta doesn't redraw param screen, native refresh rate is slow, manually redraw for smoother visuals when on param screen
+  local function p_redraw()
+    if _menu.mode then
+      _menu.rebuild_params()
+    end
   end
 
   -- local mft_port_param = {
@@ -1408,11 +1468,14 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
     mft = nil
   end
 
-  -- table of midi cc handlers, hiearchy is ch -> num -> {func = function, state = {}}
+  -- mft_led_settings = {}
+
+  -- table of midi cc handlers, hiearchy is ch -> encoder num -> {func = function, state = {}}
   mft_handlers = {}
 
   local enc_chan = 1
   local enc_s_chan = 5 -- "shift" channel when encoder is turned while pressed
+  local switch_chan = 2 -- channel for msg sent when encoder pressed/released (0/127)
   mft_handlers[enc_chan] = {}
   mft_handlers[enc_s_chan] = {}
 
@@ -1428,26 +1491,117 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
     end
   end
 
-  -- lower right corner, beads octave (txo cv 3)
+  -- template for a new mapping
+  -- mft_handlers[][] = {}
+  -- mft_handlers[][].state = {}
+  -- mft_handlers[][].func = function(msg)
+  -- end
+
+  -- table of clock functions for animating encoder LEDs
+  -- keys are encoder numbers (0-15)
+  -- values are tables with keys:
+  --   - `func`: the function to be submitted to clock.run
+  --   - `id`: the id returned by clock.run, should be nil if not running
+  mft_pulsers = {}
+
+  -- ENC 12, global tempo
+  mft_handlers[enc_chan][12] = {}
+  mft_handlers[enc_chan][12].state = {
+    led_on = 1
+  }
+  mft_handlers[enc_chan][12].func = function(msg)
+    params:delta("clock_bpm", msg_delta(msg) * 2)
+    p_redraw()
+  end
+
+  local function update_enc_12_led(bpm)
+    local range
+    local min
+
+    if bpm <= 40 then -- 10-40
+      min = 10
+      range = 30
+      mft:cc(12, 80, 2) -- red
+    elseif bpm <= 160 then -- 41-160
+      min = 41
+      range = 119
+      mft:cc(12, 0, 2) -- revert to normal color
+    else -- 161-640
+      min = 161
+      range = 439
+      mft:cc(12, 100, 2) -- purple
+    end
+
+    local f = (bpm - min) / range
+    local v = math.floor(127 * f + 0.5)
+
+    -- update indicator level for both regular and shift encoder
+    mft:cc(12, v, enc_chan)
+    mft:cc(12, v, enc_s_chan)
+  end
+  table.insert(param_callbacks_3u['clock_bpm'], update_enc_12_led)
+  -- led pulses to clock, 1 pulse per beat
+  -- not using because seems to have clock capped
+  -- mft:cc(12, 13, 3)
+
+  -- led pulser, 1 pulse per beat
+  add_animator(12, function()
+    while true do
+      clock.sync(1)
+      mft:cc(12, 17, 3)
+      clock.sync(1/8)
+      mft:cc(12, mft_rgb_brightness_default, 3)
+    end
+  end)
+
+  -- ENC 12 SHIFT, global tempo x2
+  mft_handlers[enc_s_chan][12] = {}
+  mft_handlers[enc_s_chan][12].state = {
+    delta = 0
+  }
+  mft_handlers[enc_s_chan][12].func = function(msg)
+    local s = mft_handlers[enc_chan][15].state
+    local desensitivity = 5
+    local p_id = "clock_bpm_x2"
+
+    s.delta = s.delta + msg_delta(msg)
+
+    if s.delta % desensitivity == 0 then
+      if s.delta < 0 then
+        params:delta(p_id, -1)
+        s.delta = desensitivity - 1
+      elseif s.delta > 0 then
+        params:delta(p_id, 1)
+        s.delta = (desensitivity - 1) * -1
+      end
+
+      p_redraw()
+    end
+  end
+
+  -- ENC 15, beads octave (txo cv 3)
   mft_handlers[enc_chan][15] = {}
   mft_handlers[enc_chan][15].state = {
     delta = 0
   }
   mft_handlers[enc_chan][15].func = function(msg)
     local s = mft_handlers[enc_chan][15].state
-    local desensitize = 5
+    local desensitivity = 5
+    local p_id = "txo_cv_3_oct"
 
     s.delta = s.delta + msg_delta(msg)
 
     -- if delta reaches the threshold, do param delta and set internal delta to the next "step" (at the edge of range, next to the threshold that was just crossed)
-    if s.delta % desensitize == 0 then
+    if s.delta % desensitivity == 0 then
       if s.delta < 0 then
-        params:delta("txo_cv_3_oct", -1)
-        s.delta = desensitize - 1
+        params:delta(p_id, -1)
+        s.delta = desensitivity - 1
       elseif s.delta > 0 then
-        params:delta("txo_cv_3_oct", 1)
-        s.delta = (desensitize - 1) * -1
+        params:delta(p_id, 1)
+        s.delta = (desensitivity - 1) * -1
       end
+
+      p_redraw()
     end
   end
 
@@ -1584,4 +1738,75 @@ function restore_redraw(redraw_func)
     end
   end, 1/10)
   redraw_restore_metro:start()
+end
+
+----- BEGIN MFT LED ANIMATION SYSTEM -----
+mft_animators = {}
+-- for i=0,15 do
+--   mft_animators[i] = {}
+-- end
+
+-- "behavior" can be 'error', 'ignore', or 'force'
+function add_animator(enc, func, behavior)
+  behavior = behavior or "error"
+
+  if mft_animators[enc] ~= nil then
+    if behavior == "error" then
+      error("Failed to add animator to mft encoder "..enc..", animator already present")
+    elseif behavior == "ignore" then
+      debug("Tried to add animator to mft encoder "..enc>>", animator already present, ignoring")
+      return
+    elseif behavior == "force" and mft_animators[enc].id then
+      clock.cancel(mft_animators[enc].id)
+    else
+      error("Invalid value for param `behavior`. Valid values are 'error', 'ignore', or 'force'")
+    end
+  end
+
+  local t = {
+    func = func
+  }
+
+  if params:get("mft_animate_3u") == 1 then
+    t.id = clock.run(func)
+  end
+
+  mft_animators[enc] = t
+end
+
+function remove_animator(enc)
+  local anim_t = mft_animators[enc]
+
+  if anim_t and anim_t.id then
+    clock.cancel(anim_t.id)
+  end
+
+  mft_animators[enc] = nil
+end
+
+function enable_animate(enc, state)
+  state = state or true
+
+  local anim_t = mft_animators[enc]
+
+  if state then
+    if params:get("mft_animate_3u") ~= 1 then
+      debug("attempted to enable mft animation on encoder "..enc.." while the mft_animate param was false")
+    elseif anim_t and not anim_t.id then
+      anim_t.id = clock.run(anim_t.func)
+    end
+  else
+    if anim_t and anim_t.id then
+      clock.cancel(anim_t.id)
+      anim_t.id = nil
+    end
+  end
+end
+----- END MFT LED ANIMATION SYSTEM -----
+
+debug_3u = true
+function debug(s)
+  if debug_3u then
+    print("debug: "..s)
+  end
 end
