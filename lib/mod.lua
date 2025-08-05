@@ -1,5 +1,5 @@
 local mod = require 'core/mods'
-include 'tools/tools'
+local util = require 'util'
 
 function tup()
   include 'tools/tools'
@@ -1430,11 +1430,59 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
     end
   }
   params:add(mft_animate_param)
-
   ----- BEGIN MIDI FIGHTER TWISTER (MFT) CONFIG -----
   -- params:add_separator("mft_settings", "midi fighter twister")
 
   mft_rgb_brightness_default = 35 -- ~equiv to value 100 in mft brightness config
+  mft_indicator_brightness_default = 75 -- ~equiv to value 100 in mft brightness config
+  mft_long_press_threshold = .1
+
+  -- key: number of indicator dots to be fully lit
+  -- value: the cc value that needs to be sent to an encoder configured in "blended bar" mode to light that many dots
+  local mft_ind_n_val = {}
+  mft_ind_n_val[0] = 0
+  mft_ind_n_val[1] = 12
+  mft_ind_n_val[2] = 23
+  mft_ind_n_val[3] = 35
+  mft_ind_n_val[4] = 46
+  mft_ind_n_val[5] = 58
+  mft_ind_n_val[6] = 69
+  mft_ind_n_val[7] = 81
+  mft_ind_n_val[8] = 92
+  mft_ind_n_val[9] = 104
+  mft_ind_n_val[10] = 115
+  mft_ind_n_val[11] = 127
+
+  local mft_colors = {
+    blue = 1,
+    light_blue = 15,
+    sky_blue = 30,
+    teal = 40,
+    green = 50,
+    lime = 60,
+    yellow = 65,
+    goldenrod = 70,
+    orange = 75,
+    lava_red = 80,
+    red = 85,
+    magenta = 90,
+    purple = 100,
+    periwinkle = 110,
+    soft_blue = 115,
+    ocean_blue = 120
+  }
+
+  local function mft_color(enc, color)
+    if type(color) == "string" then
+      color = mft_colors['color']
+    end
+
+    if not color then
+      error("color cannot be nil, or color name was not found in color table")
+    end
+
+    mft:cc(enc, color, 2)
+  end
 
   -- given a "relative" midi msg with a value of 63 or 65, returns -1 or 1
   -- value returned when passed other messages is undefined
@@ -1478,6 +1526,7 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
   local switch_chan = 2 -- channel for msg sent when encoder pressed/released (0/127)
   mft_handlers[enc_chan] = {}
   mft_handlers[enc_s_chan] = {}
+  mft_handlers[switch_chan] = {}
 
   mft.event = function(data)
     local msg = midi.to_msg(data)
@@ -1492,17 +1541,10 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
   end
 
   -- template for a new mapping
-  -- mft_handlers[][] = {}
-  -- mft_handlers[][].state = {}
-  -- mft_handlers[][].func = function(msg)
+  -- mft_handlers[enc_chan][enc_num] = {}
+  -- mft_handlers[enc_chan][enc_num].state = {}
+  -- mft_handlers[enc_chan][enc_num].func = function(msg)
   -- end
-
-  -- table of clock functions for animating encoder LEDs
-  -- keys are encoder numbers (0-15)
-  -- values are tables with keys:
-  --   - `func`: the function to be submitted to clock.run
-  --   - `id`: the id returned by clock.run, should be nil if not running
-  mft_pulsers = {}
 
   -- ENC 12, global tempo
   mft_handlers[enc_chan][12] = {}
@@ -1521,7 +1563,7 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
     if bpm <= 40 then -- 10-40
       min = 10
       range = 30
-      mft:cc(12, 80, 2) -- red
+      mft:cc(12, mft_colors['red'], 2)
     elseif bpm <= 160 then -- 41-160
       min = 41
       range = 119
@@ -1529,7 +1571,7 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
     else -- 161-640
       min = 161
       range = 439
-      mft:cc(12, 100, 2) -- purple
+      mft:cc(12, mft_colors['periwinkle'], 2)
     end
 
     local f = (bpm - min) / range
@@ -1549,7 +1591,8 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
     while true do
       clock.sync(1)
       mft:cc(12, 17, 3)
-      clock.sync(1/8)
+      -- clock.sync(1/8)
+      clock.sleep(0.01)
       mft:cc(12, mft_rgb_brightness_default, 3)
     end
   end)
@@ -1560,7 +1603,7 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
     delta = 0
   }
   mft_handlers[enc_s_chan][12].func = function(msg)
-    local s = mft_handlers[enc_chan][15].state
+    local s = mft_handlers[enc_s_chan][12].state
     local desensitivity = 5
     local p_id = "clock_bpm_x2"
 
@@ -1576,6 +1619,186 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
       end
 
       p_redraw()
+    end
+  end
+
+  -- ENC 13 ansible clock (txo tr 4)
+  mft_handlers[enc_chan][13] = {}
+  mft_handlers[enc_chan][13].state = {
+    delta = 0
+  }
+  mft_handlers[enc_chan][13].func = function(msg)
+    local s = mft_handlers[enc_chan][13].state
+    local desensitivity = 5
+    local p_id = "clock_txo_tr_4_div_x2"
+
+    s.delta = s.delta + msg_delta(msg)
+
+    if s.delta % desensitivity == 0 then
+      if s.delta < 0 then
+        params:delta(p_id, -1)
+        s.delta = desensitivity - 1
+      elseif s.delta > 0 then
+        params:delta(p_id, 1)
+        s.delta = (desensitivity - 1) * -1
+      end
+
+      p_redraw()
+    end
+  end
+
+  local function update_enc_13_animator(div, z)
+    div = div or params:get('clock_txo_tr_4_div')
+    z = z or params:get('clock_txo_tr_4')
+
+    if z == 0 then
+      remove_animator(13)
+    else
+      add_animator(13, function()
+        local function dark_blink() end
+
+        if clock.get_beat_sec() / (div * 8) < 0.01 then
+          dark_blink = function()
+            clock.sync(1/(div*8))
+          end
+        else
+          dark_blink = function()
+            clock.sleep(0.01)
+          end
+        end
+
+        while true do
+          clock.sync(1/div)
+          mft:cc(13, 17, 3)
+          -- clock.sync(1/(div*8))
+          -- clock.sleep(0.01)
+          dark_blink()
+          mft:cc(13, mft_rgb_brightness_default, 3)
+        end
+      end, "force")
+    end
+  end
+
+  table.insert(param_callbacks_3u['clock_txo_tr_4_div'], function(div)
+    local val
+    local color = 0
+
+    -- usually will be power of 2
+    if div == 1 then
+      val = mft_ind_n_val[1]
+    elseif div == 2 then
+      val = mft_ind_n_val[2]
+    elseif div == 4 then
+      val = mft_ind_n_val[4]
+    elseif div == 8 then
+      val = mft_ind_n_val[6]
+    elseif div == 16 then
+      val = mft_ind_n_val[7]
+    elseif div == 32 then
+      val = mft_ind_n_val[8]
+    elseif div == 64 then
+      val = mft_ind_n_val[9]
+    elseif div == 128 then
+      val = mft_ind_n_val[10]
+    elseif div == 256 then
+      val = mft_ind_n_val[11]
+    else
+      color = mft_colors['soft_blue']
+
+      if 5 <= div and div <= 11 then
+        val = mft_ind_n_val[div]
+      else
+        val = 0
+      end
+    end
+
+    update_enc_13_animator(div)
+    mft:cc(13, color, 2)
+    mft:cc(13, val, enc_chan)
+    mft:cc(13, val, enc_s_chan)
+  end)
+
+  table.insert(param_callbacks_3u['clock_txo_tr_4'], function(z)
+    local rgb_brightness
+    local ind_brightness
+
+    if z == 0 then
+      rgb_brightness = 17
+      ind_brightness = 65
+    else
+      rgb_brightness = mft_rgb_brightness_default
+      ind_brightness = mft_indicator_brightness_default
+    end
+
+    clock.run(function()
+      mft:cc(13, rgb_brightness, 3)
+      -- for some reason fails without this sleep, only 2nd command takes effect
+      clock.sleep(0.01)
+      mft:cc(13, ind_brightness, 3)
+    end)
+
+    update_enc_13_animator(nil, z)
+  end)
+
+  -- ENC 13 shift, nothing for now just prevents a switch short press
+  mft_handlers[enc_s_chan][13] = {}
+  mft_handlers[enc_s_chan][13].state = {
+    delta = 0
+  }
+  mft_handlers[enc_s_chan][13].func = function(msg)
+    local s = mft_handlers[enc_s_chan][13].state
+    local desensitivity = 5
+    -- local p_id = "txo_cv_3_oct"
+
+    s.delta = s.delta + msg_delta(msg)
+
+    if s.delta % desensitivity == 0 then
+      if s.delta < 0 then
+        -- params:delta(p_id, -1)
+        s.delta = desensitivity - 1
+      elseif s.delta > 0 then
+        -- params:delta(p_id, 1)
+        s.delta = (desensitivity - 1) * -1
+      end
+
+      mft_handlers[switch_chan][13].state.enc_turned = true
+      p_redraw()
+    end
+  end
+
+  -- ENC 13 SWITCH, enable/disable txo tr 3 clock
+  mft_handlers[switch_chan][13] = {}
+  mft_handlers[switch_chan][13].state = {
+    pressed = false,
+    press_time = nil,
+    enc_turned = false -- set if the encoder is turned while pressed
+  }
+  mft_handlers[switch_chan][13].func = function(msg)
+    local s = mft_handlers[switch_chan][13].state
+
+    if msg.val == 127 then -- pressed
+      s.pressed = true
+      s.press_time = util.time()
+      s.enc_turned = false
+      mft_handlers[enc_s_chan][13].delta = 0
+    elseif msg.val == 0 then -- released
+      s.pressed = false
+
+      -- if the encoder was turned, the press was for the encoder's shift
+      if not s.enc_turned then
+        local t = util.time()
+
+        if t - s.press_time >= .25 then -- long press
+
+        else -- short press
+          params:set("clock_txo_tr_4", 1 - params:get("clock_txo_tr_4"))
+        end
+      else
+      end
+
+      s.press_time = nil
+    else
+      error("msg.val was "..msg.val..", expected it to be 0 or 127")
     end
   end
 
@@ -1625,7 +1848,6 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
   end
   table.insert(param_callbacks_3u['txo_cv_3_oct'], update_enc_15_led)
   ----- END MIDI FIGHTER TWISTER (MFT) CONFIG -----
-
   params:default()
   params:bang()
 end)
@@ -1748,13 +1970,13 @@ mft_animators = {}
 
 -- "behavior" can be 'error', 'ignore', or 'force'
 function add_animator(enc, func, behavior)
-  behavior = behavior or "error"
+  behavior = behavior or "force"
 
   if mft_animators[enc] ~= nil then
     if behavior == "error" then
       error("Failed to add animator to mft encoder "..enc..", animator already present")
     elseif behavior == "ignore" then
-      debug("Tried to add animator to mft encoder "..enc>>", animator already present, ignoring")
+      debug_msg("Tried to add animator to mft encoder "..enc>>", animator already present, ignoring")
       return
     elseif behavior == "force" and mft_animators[enc].id then
       clock.cancel(mft_animators[enc].id)
@@ -1791,7 +2013,7 @@ function enable_animate(enc, state)
 
   if state then
     if params:get("mft_animate_3u") ~= 1 then
-      debug("attempted to enable mft animation on encoder "..enc.." while the mft_animate param was false")
+      debug_msg("attempted to enable mft animation on encoder "..enc.." while the mft_animate param was false")
     elseif anim_t and not anim_t.id then
       anim_t.id = clock.run(anim_t.func)
     end
@@ -1805,7 +2027,7 @@ end
 ----- END MFT LED ANIMATION SYSTEM -----
 
 debug_3u = true
-function debug(s)
+function debug_msg(s)
   if debug_3u then
     print("debug: "..s)
   end
