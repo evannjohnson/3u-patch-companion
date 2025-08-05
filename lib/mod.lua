@@ -1766,7 +1766,7 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
     end
   end
 
-  -- ENC 13 SWITCH, enable/disable txo tr 3 clock
+  -- ENC 13 SWITCH, enable/disable txo tr 4 clock
   mft_handlers[switch_chan][13] = {}
   mft_handlers[switch_chan][13].state = {
     pressed = false,
@@ -1792,6 +1792,186 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
 
         else -- short press
           params:set("clock_txo_tr_4", 1 - params:get("clock_txo_tr_4"))
+        end
+      else
+      end
+
+      s.press_time = nil
+    else
+      error("msg.val was "..msg.val..", expected it to be 0 or 127")
+    end
+  end
+
+  -- ENC 14 beads seed clock (txo tr 3)
+  mft_handlers[enc_chan][14] = {}
+  mft_handlers[enc_chan][14].state = {
+    delta = 0
+  }
+  mft_handlers[enc_chan][14].func = function(msg)
+    local s = mft_handlers[enc_chan][14].state
+    local desensitivity = 5
+    local p_id = "clock_txo_tr_3_div_x2"
+
+    s.delta = s.delta + msg_delta(msg)
+
+    if s.delta % desensitivity == 0 then
+      if s.delta < 0 then
+        params:delta(p_id, -1)
+        s.delta = desensitivity - 1
+      elseif s.delta > 0 then
+        params:delta(p_id, 1)
+        s.delta = (desensitivity - 1) * -1
+      end
+
+      p_redraw()
+    end
+  end
+
+  local function update_enc_14_animator(div, z)
+    div = div or params:get('clock_txo_tr_3_div')
+    z = z or params:get('clock_txo_tr_3')
+
+    if z == 0 then
+      remove_animator(14)
+    else
+      add_animator(14, function()
+        local function dark_blink() end
+
+        if clock.get_beat_sec() / (div * 8) < 0.01 then
+          dark_blink = function()
+            clock.sync(1/(div*8))
+          end
+        else
+          dark_blink = function()
+            clock.sleep(0.01)
+          end
+        end
+
+        while true do
+          clock.sync(1/div)
+          mft:cc(14, 17, 3)
+          -- clock.sync(1/(div*8))
+          -- clock.sleep(0.01)
+          dark_blink()
+          mft:cc(14, mft_rgb_brightness_default, 3)
+        end
+      end, "force")
+    end
+  end
+
+  table.insert(param_callbacks_3u['clock_txo_tr_3_div'], function(div)
+    local val
+    local color = 0
+
+    -- usually will be power of 2
+    if div == 1 then
+      val = mft_ind_n_val[1]
+    elseif div == 2 then
+      val = mft_ind_n_val[2]
+    elseif div == 4 then
+      val = mft_ind_n_val[4]
+    elseif div == 8 then
+      val = mft_ind_n_val[6]
+    elseif div == 16 then
+      val = mft_ind_n_val[7]
+    elseif div == 32 then
+      val = mft_ind_n_val[8]
+    elseif div == 64 then
+      val = mft_ind_n_val[9]
+    elseif div == 128 then
+      val = mft_ind_n_val[10]
+    elseif div == 256 then
+      val = mft_ind_n_val[11]
+    else
+      color = mft_colors['soft_blue']
+
+      if 5 <= div and div <= 11 then
+        val = mft_ind_n_val[div]
+      else
+        val = 0
+      end
+    end
+
+    update_enc_14_animator(div)
+    mft:cc(14, color, 2)
+    mft:cc(14, val, enc_chan)
+    mft:cc(14, val, enc_s_chan)
+  end)
+
+  table.insert(param_callbacks_3u['clock_txo_tr_3'], function(z)
+    local rgb_brightness
+    local ind_brightness
+
+    if z == 0 then
+      rgb_brightness = 17
+      ind_brightness = 65
+    else
+      rgb_brightness = mft_rgb_brightness_default
+      ind_brightness = mft_indicator_brightness_default
+    end
+
+    clock.run(function()
+      mft:cc(14, rgb_brightness, 3)
+      -- for some reason fails without this sleep, only 2nd command takes effect
+      clock.sleep(0.01)
+      mft:cc(14, ind_brightness, 3)
+    end)
+
+    update_enc_14_animator(nil, z)
+  end)
+
+  -- ENC 14 shift, nothing for now just prevents a switch short press
+  mft_handlers[enc_s_chan][14] = {}
+  mft_handlers[enc_s_chan][14].state = {
+    delta = 0
+  }
+  mft_handlers[enc_s_chan][14].func = function(msg)
+    local s = mft_handlers[enc_s_chan][14].state
+    local desensitivity = 5
+    -- local p_id = "txo_cv_3_oct"
+
+    s.delta = s.delta + msg_delta(msg)
+
+    if s.delta % desensitivity == 0 then
+      if s.delta < 0 then
+        -- params:delta(p_id, -1)
+        s.delta = desensitivity - 1
+      elseif s.delta > 0 then
+        -- params:delta(p_id, 1)
+        s.delta = (desensitivity - 1) * -1
+      end
+
+      mft_handlers[switch_chan][14].state.enc_turned = true
+      p_redraw()
+    end
+  end
+
+  -- ENC 14 SWITCH, enable/disable txo tr 3 clock
+  mft_handlers[switch_chan][14] = {}
+  mft_handlers[switch_chan][14].state = {
+    pressed = false,
+    press_time = nil,
+    enc_turned = false -- set if the encoder is turned while pressed
+  }
+  mft_handlers[switch_chan][14].func = function(msg)
+    local s = mft_handlers[switch_chan][14].state
+
+    if msg.val == 127 then -- pressed
+      s.pressed = true
+      s.press_time = util.time()
+      s.enc_turned = false
+      mft_handlers[enc_s_chan][14].delta = 0
+    elseif msg.val == 0 then -- released
+      s.pressed = false
+
+      -- if the encoder was turned, the press was for the encoder's shift
+      if not s.enc_turned then
+        local t = util.time()
+
+        if t - s.press_time >= .25 then -- long press
+
+        else -- short press
+          params:set("clock_txo_tr_3", 1 - params:get("clock_txo_tr_3"))
         end
       else
       end
