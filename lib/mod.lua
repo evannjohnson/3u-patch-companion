@@ -1832,10 +1832,14 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
 
     local range = mft_rgb_brightness_default - 17
     local offset = params:get("crow_env_offset")
-    -- print("offset: "..offset)
-    -- print("out: "..out)
-    -- print("out v: "..crow_outputs[out])
-    local val = 17 + range * ((crow_outputs[out] + offset) / 8)
+    local val
+
+    if params:get("mft_animate_3u") == 1 then
+      val = 17 + range * ((crow_outputs[out] + offset) / 8)
+    else
+      val = 17 + range * (offset / 8)
+    end
+
     val = math.floor(val + 0.5)
     val = math.min(val, mft_rgb_brightness_default)
 
