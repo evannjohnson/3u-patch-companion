@@ -57,7 +57,7 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
   -- paste the following into kakoune prompt to get number of params
   -- doesn't work anymore since i'm creating some params programmatically
   -- exec \%sparams:add\(<ret>:echo<space>%val{selection_count}<ret>
-  params:add_group("3u_patch_params", "3U PATCH", 77)
+  params:add_group("3u_patch_params", "3U PATCH", 79)
 
   -- allows keys and encoders to be mapped to nothing
   local empty_param = {
@@ -324,18 +324,131 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
     end
   end
 
+  local txo_cv_3_note = {
+    id="txo_cv_3_note",
+    name="txo cv 3 note",
+    type="number",
+    min=-60,
+    max=60,
+    default=0,
+    action=function(n)
+      crow.ii.txo.cv_n(3, n)
+    end
+  }
+  params:add(txo_cv_3_note)
+
   local txo_cv_3_oct = {
     id="txo_cv_3_oct",
     name="txo cv 3 oct",
     type="number",
-    min=-3,
-    max=5,
+    min=-1,
+    max=1,
     default=0,
-    action=function(x)
-      crow.ii.txo.cv_n(3, 12 * x)
+    formatter=function(p)
+      return params:get("txo_cv_3_note")
+    end,
+    action=function(d)
+      -- local n = params:get("txo_cv_3_note")
+      -- if d == 1 then
+      --   n = n+12
+      -- elseif d == -1 then
+      -- end
+      params:set("txo_cv_3_note", params:get("txo_cv_3_note") + (d*12))
+      params:lookup_param("txo_cv_3_oct").value = 0
+      -- crow.ii.txo.cv_n(3, 12 * x)
     end
   }
   params:add(txo_cv_3_oct)
+
+  local txo_cv_3_fifths_octs = {
+    id="txo_cv_3_fifths_octs",
+    name="txo cv 3 fifths octs",
+    type="number",
+    min=-1,
+    max=1,
+    default=0,
+    formatter=function(p)
+      return params:get("txo_cv_3_note")
+    end,
+    action=function(d)
+      if d == 0 then
+        return
+      end
+
+      local n = params:get("txo_cv_3_note")
+      if n < 0 then
+        local oct = math.ceil(n / 12)
+        local oct_n = oct * 12
+        local off = n - oct_n
+
+        if off == 0 then
+          if d == 1 then
+            n = oct_n + 5
+          else
+            n = oct_n - 7
+          end
+        elseif off == -7 then
+          if d == 1 then
+            n = oct_n
+          else
+            n = oct_n - 12
+          end
+        elseif off > -7 then
+          if d == 1 then
+            n = oct_n
+          else
+            n = oct_n - 7
+          end
+        elseif off < -7 then
+          if d == 1 then
+            n = oct_n - 7
+          else
+            n = oct_n - 12
+          end
+        end
+      elseif n > 0 then
+        local oct = math.floor(n / 12)
+        local oct_n = oct * 12
+        local off = n - oct_n
+
+        if off == 0 then
+          if d == 1 then
+            n = oct_n + 7
+          else
+            n = oct_n - 5
+          end
+        elseif off == 7 then
+          if d == 1 then
+            n = oct_n + 12
+          else
+            n = oct_n
+          end
+        elseif off < 7 then
+          if d == 1 then
+            n = oct_n + 7
+          else
+            n = oct_n
+          end
+        elseif off > 7 then
+          if d == 1 then
+            n = oct_n + 12
+          else
+            n = oct_n + 7
+          end
+        end
+      else -- n == 0
+        if d == 1 then
+          n = 7
+        else
+          n = -7
+        end
+      end
+
+      params:set("txo_cv_3_note", n)
+      params:lookup_param("txo_cv_3_fifths_octs").value = 0
+    end
+  }
+  params:add(txo_cv_3_fifths_octs)
 
   -- this one is for mapping controllers to
   local txo_cv_3_oct_delta = {
@@ -1526,6 +1639,7 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
   mft_ind_n_detent_val[5] = 127
 
   local mft_colors = {
+    normal = 0,
     blue = 1,
     light_blue = 15,
     sky_blue = 30,
@@ -2342,25 +2456,105 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
     end
   end
 
-  local function update_enc_15_led(oct)
-    local oct_to_cc = {}
-    oct_to_cc[-5] = 0
-    oct_to_cc[-4] = 10
-    oct_to_cc[-3] = 20
-    oct_to_cc[-2] = 40
-    oct_to_cc[-1] = 50
-    oct_to_cc[0] = 63
-    oct_to_cc[1] = 70
-    oct_to_cc[2] = 80
-    oct_to_cc[3] = 100
-    oct_to_cc[4] = 120
-    oct_to_cc[5] = 127
+  table.insert(param_callbacks_3u['txo_cv_3_note'], function(n)
+    local val
+    local color
+    local oct
+    local off
+
+    if n <= 0 then
+      oct = math.ceil(n / 12)
+      off = n - (oct * 12)
+    elseif n > 0 then
+      oct = math.floor(n / 12)
+      off = n - (oct * 12)
+    end
+
+    if off == 0 then
+      color = mft_colors['normal']
+      val = mft_ind_n_detent_val[oct]
+    elseif off == 7 then
+      color = mft_colors['lava_red']
+      val =  mft_ind_n_detent_val[oct] + 6
+    elseif off == -7 then
+      color = mft_colors['lava_red']
+      val =  mft_ind_n_detent_val[oct] - 6
+    elseif off > 0 then
+      color = mft_colors['magenta']
+      val =  mft_ind_n_detent_val[oct] + off
+    elseif off < 0 then
+      color = mft_colors['magenta']
+      val =  mft_ind_n_detent_val[oct] - off
+    end
 
     -- update indicator level for both regular and shift encoder
-    mft:cc(15, oct_to_cc[oct], enc_chan)
-    mft:cc(15, oct_to_cc[oct], enc_s_chan)
+    mft:cc(15, val, enc_chan)
+    mft:cc(15, val, enc_s_chan)
+    mft:cc(15, color, 2)
+  end)
+
+  -- ENC 15 SHIFT, beads fifths and octaves (txo cv 3)
+  mft_handlers[enc_s_chan][15] = {}
+  mft_handlers[enc_s_chan][15].state = {
+    delta = 0
+  }
+  mft_handlers[enc_s_chan][15].func = function(msg)
+    local s = mft_handlers[enc_s_chan][15].state
+    local desensitivity = 3
+    local p_id = "txo_cv_3_fifths_octs"
+
+    s.delta = s.delta + msg_delta(msg)
+
+    if s.delta % desensitivity == 0 then
+      if s.delta < 0 then
+        params:delta(p_id, -1)
+        s.delta = desensitivity - 1
+      elseif s.delta > 0 then
+        params:delta(p_id, 1)
+        s.delta = (desensitivity - 1) * -1
+      end
+
+      mft_handlers[switch_chan][15].state.enc_turned = true
+      p_redraw()
+    end
   end
-  table.insert(param_callbacks_3u['txo_cv_3_oct'], update_enc_15_led)
+
+  -- ENC 15 SWITCH
+  mft_handlers[switch_chan][15] = {}
+  mft_handlers[switch_chan][15].state = {
+    pressed = false,
+    press_time = nil,
+    enc_turned = false -- set if the encoder is turned while pressed
+  }
+  mft_handlers[switch_chan][15].func = function(msg)
+    local s = mft_handlers[switch_chan][15].state
+
+    if msg.val == 127 then -- pressed
+      s.pressed = true
+      s.press_time = util.time()
+      s.enc_turned = false
+      mft_handlers[enc_s_chan][15].delta = 0
+    elseif msg.val == 0 then -- released
+      s.pressed = false
+
+      -- if the encoder was turned, the press was for the encoder's shift
+      if not s.enc_turned then
+        local t = util.time()
+
+        if t - s.press_time >= .25 then -- long press
+
+        else -- short press
+          params:set("txo_cv_3_note", 0)
+        end
+      else
+      end
+
+      s.press_time = nil
+    else
+      error("msg.val was "..msg.val..", expected it to be 0 or 127")
+    end
+  end
+
   ----- END MIDI FIGHTER TWISTER (MFT) CONFIG -----
   params:default()
   params:bang()
