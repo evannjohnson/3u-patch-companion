@@ -7,6 +7,9 @@ end
 
 -- local mft -- midi fighter twister midi device
 param_callbacks_3u = {}
+-- holds the voltage value of a crow output after a crow.output[n].query()
+-- need to init values because of tangled async code, should refactor to avoid this
+crow_outputs = {0, 0, 0, 0}
 
 params.params_add_saved_by_3u = params.add
 function params:add(p)
@@ -54,7 +57,7 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
   -- paste the following into kakoune prompt to get number of params
   -- doesn't work anymore since i'm creating some params programmatically
   -- exec \%sparams:add\(<ret>:echo<space>%val{selection_count}<ret>
-  params:add_group("3u_patch_params", "3U PATCH", 76)
+  params:add_group("3u_patch_params", "3U PATCH", 77)
 
   -- allows keys and encoders to be mapped to nothing
   local empty_param = {
@@ -465,6 +468,9 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
 
       -- local function for clock.run
       local function dofunc(z)
+        local out = params:get("crow_env_out")
+        local input = params:get("crow_env_in")
+
         if z == 1 then
         -- if z == 1 and not crow_env_init_3u then
           norns.crow.loadscript("3u-patch-companion/crow/env-public-vars.lua")
@@ -475,14 +481,12 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
           -- script is loaded, allow env params to set public vars
           crow_env_init_3u = true
 
-          local out = params:get("crow_env_out")
-          local input = params:get("crow_env_in")
           local amp = params:get("crow_env_amp")
           local retrig = params:string("crow_env_retrig_behavior")
-          local len = params:get("crow_env_time")
+          local time = params:get("crow_env_time")
           local ratio = params:get("crow_env_ratio")
-          local rise = len * ratio
-          local fall = len * (1 - ratio)
+          local rise = time * ratio
+          local fall = time * (1 - ratio)
           local rise_shape = params:string("crow_env_rise_shape")
           local fall_shape = params:string("crow_env_fall_shape")
           local start_stage = ""
@@ -499,6 +503,9 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
             crow.public.envactive = 0
           end
 
+          crow.output[out].receive = function(v) crow_outputs[out] = v end
+          crow.output[out].query()
+
           crow.input[input].mode('change', 1, 0.1, 'rising')
 
           if retrig == "no retrig" then
@@ -506,12 +513,14 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
               if crow.public.envactive == 0 then
                 crow.public.envactive = 1
                 crow.output[crow.public.envout]()
+                enc_10_11_env_animate(nil, nil)
               end
             end
           else
             crow.input[input].change = function()
               crow.public.envactive = 1
               crow.output[crow.public.envout]()
+              enc_10_11_env_animate(nil, nil)
             end
           end
 
@@ -533,6 +542,9 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
             end
           end
         elseif z == 0 then
+          -- reset offset
+          crow.cal.output[out].offset = crow_base_offset[out]
+
           params:lookup_param("crow_env_active").name = "○ crow env"
           params:hide("crow_env_time")
           params:hide("crow_env_ratio")
@@ -562,10 +574,11 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
       quantum = 0.01/(4-0.01),
       wrap = false
     },
-    action=function(len)
+    action=function(time)
       if crow_env_init_3u then
-        local rise = len * params:get("crow_env_ratio")
-        local fall = len * (1 - params:get("crow_env_ratio"))
+        local ratio = params:get("crow_env_ratio")
+        local rise = time * ratio + 0.0005
+        local fall = time * (1 - ratio)
         local out = params:get("crow_env_out")
         crow.output[out].dyn.rise = rise
         crow.output[out].dyn.fall = fall
@@ -593,19 +606,63 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
     },
     action=function(ratio)
       if crow_env_init_3u then
-        local rise = params:get("crow_env_time") * ratio
+        -- if ratio == 0 then
+          -- don't set ratio to true zero, this way ensures the envelope drops
+          -- to zero when using the "from zero" retrig behavior
+          -- ratio = 0.001
+        -- end
+        local time = params:get("crow_env_time")
+        -- don't set rise to true zero, this way ensures the envelope drops
+        -- to zero when using the "from zero" retrig behavior
+        local rise = time * ratio + 0.0005
         local fall = params:get("crow_env_time") * (1 - ratio)
         local out = params:get("crow_env_out")
         crow.output[out].dyn.rise = rise
         crow.output[out].dyn.fall = fall
       end
-    end
+    end,
+    -- formatter=function(param) return string.format("%.3f", param:get()) end
   }
   params:add(crow_env_ratio)
   if params:get("crow_env_active") == 0 then
     params:hide("crow_env_ratio")
     _menu.rebuild_params()
   end
+
+  -- my values for the cal offset of the outputs
+  -- need to figure out how to read these from norns
+  crow_base_offset = {}
+  crow_base_offset[1] = 0.02296516
+  crow_base_offset[2] = -0.005275138
+  crow_base_offset[3] = -0.003352082
+  crow_base_offset[4] = -0.003550681
+
+  local crow_env_offset ={
+    id="crow_env_offset",
+    name="crow env offset",
+    type="control",
+    controlspec=controlspec.def{
+      min = 0,
+      max = 10,
+      warp = 'lin',
+      step = 0.1,
+      default = 0,
+      quantum = 0.1/10,
+      wrap = false
+    },
+    action=function(offset)
+      -- if crow_env_init_3u then
+        local out = params:get("crow_env_out")
+        crow.cal.output[out].offset = crow_base_offset[out] + offset
+      -- end
+    end
+  }
+  params:add(crow_env_offset)
+  if params:get("crow_env_active") == 0 then
+    params:hide("crow_env_offset")
+    _menu.rebuild_params()
+  end
+
 
   local crow_env_amp = {
     id="crow_env_amp",
@@ -1453,6 +1510,21 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
   mft_ind_n_val[10] = 115
   mft_ind_n_val[11] = 127
 
+  -- key: number of indicator dots to be fully lit when an encoder is in detent (centered) and blended bar mode, where 0 is centered, positive is clockwise, negative is ccw
+  -- value: cc to send to encoder
+  local mft_ind_n_detent_val = {}
+  mft_ind_n_detent_val[-5] = 0
+  mft_ind_n_detent_val[-4] = 11
+  mft_ind_n_detent_val[-3] = 24
+  mft_ind_n_detent_val[-2] = 37
+  mft_ind_n_detent_val[-1] = 50
+  mft_ind_n_detent_val[0] = 63
+  mft_ind_n_detent_val[1] = 76
+  mft_ind_n_detent_val[2] = 89
+  mft_ind_n_detent_val[3] = 102
+  mft_ind_n_detent_val[4] = 115
+  mft_ind_n_detent_val[5] = 127
+
   local mft_colors = {
     blue = 1,
     light_blue = 15,
@@ -1545,6 +1617,268 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
   -- mft_handlers[enc_chan][enc_num].state = {}
   -- mft_handlers[enc_chan][enc_num].func = function(msg)
   -- end
+
+  -- ENC 10, crow env time
+  mft_handlers[enc_chan][10] = {}
+  mft_handlers[enc_chan][10].state = {}
+  mft_handlers[enc_chan][10].func = function(msg)
+    params:delta('crow_env_time', msg_delta(msg))
+    p_redraw()
+  end
+
+  table.insert(param_callbacks_3u['crow_env_time'], function(time)
+    local min = 0.01
+    local max = 4
+    local f = (time - min) / (max - min)
+    local val = math.floor(f * 127 + 0.5)
+
+    mft:cc(10, val, enc_chan)
+  end)
+
+  -- ENC 10 SHIFT, crow env offset
+  mft_handlers[enc_s_chan][10] = {}
+  mft_handlers[enc_s_chan][10].state = {
+    delta = 0
+  }
+  mft_handlers[enc_s_chan][10].func = function(msg)
+    -- params:delta('crow_env_offset', msg_delta(msg))
+    -- p_redraw()
+
+    local s = mft_handlers[enc_s_chan][10].state
+    local desensitivity = 1
+    local p_id = 'crow_env_offset'
+
+    s.delta = s.delta + msg_delta(msg)
+
+    if s.delta % desensitivity == 0 then
+      if s.delta < 0 then
+        params:delta(p_id, -1)
+        s.delta = desensitivity - 1
+      elseif s.delta > 0 then
+        params:delta(p_id, 1)
+        s.delta = (desensitivity - 1) * -1
+      end
+
+      mft_handlers[switch_chan][10].state.enc_turned = true
+      p_redraw()
+    end
+  end
+
+  table.insert(param_callbacks_3u['crow_env_offset'], function(offset)
+    local min = 0
+    local max = 10
+    local f = (offset - min) / (max - min)
+    local val = math.floor(f * 127 + 0.5)
+
+    mft:cc(10, val, enc_s_chan)
+    enc_10_11_update_leds()
+  end)
+
+  -- ENC 10 SWITCH, trigger envelope
+  mft_handlers[switch_chan][10] = {}
+  mft_handlers[switch_chan][10].state = {
+    pressed = false,
+    press_time = nil,
+    enc_turned = false
+  }
+  mft_handlers[switch_chan][10].func = function(msg)
+    local s = mft_handlers[switch_chan][10].state
+    local out = params:get("crow_env_out")
+
+    if msg.val == 127 then -- pressed
+      s.pressed = true
+      s.press_time = util.time()
+      s.enc_turned = false
+      mft_handlers[enc_s_chan][10].delta = 0
+    elseif msg.val == 0 then -- released
+      s.pressed = false
+
+      -- if the encoder was turned, the press was for the encoder's shift
+      if not s.enc_turned then
+        local t = util.time()
+
+        if t - s.press_time >= .25 then -- long press
+
+        else -- short press, trigger envelope
+          crow.output[out]()
+          enc_10_11_env_animate(nil, nil, out)
+        end
+      else
+      end
+
+      s.press_time = nil
+    else
+      error("msg.val was "..msg.val..", expected it to be 0 or 127")
+    end
+  end
+
+  function enc_10_11_update_leds(out)
+    out = out or params:get('crow_env_out')
+    crow.output[out].query()
+
+    local range = mft_rgb_brightness_default - 17
+    local offset = params:get("crow_env_offset")
+    -- print("offset: "..offset)
+    -- print("out: "..out)
+    -- print("out v: "..crow_outputs[out])
+    local val = 17 + range * ((crow_outputs[out] + offset) / 8)
+    val = math.floor(val + 0.5)
+    val = math.min(val, mft_rgb_brightness_default)
+
+    mft:cc(10, val, 3)
+    mft:cc(11, val, 3)
+  end
+
+  function enc_10_11_env_animate(time, ratio)
+    if params:get("mft_animate_3u") == 0 then
+      return
+    end
+
+    time = time or params:get('crow_env_time')
+    ratio = ratio or params:get('crow_env_ratio')
+
+    -- only redraw as fast as is necessary for smoothly changing brightness
+    -- local a_time = time * ratio
+    -- local r_time = time - a_time
+    -- local range = mft_rgb_brightness_default - 17
+    -- local a_time_per_step = a_time/range
+    -- local r_time_per_step = r_time/range
+    -- if a_time_per_step < 1/30 then
+    --   a_time_per_step = 1/30
+    -- end
+    -- if r_time_per_step < 1/30 then
+    --   r_time_per_step = 1/30
+    -- end
+    -- local a_time_end = util.time() + a_time
+    -- local r_time_end = a_time_end + r_time
+
+    -- add_animator(10, function()
+    --   while util.time() < a_time_end do
+    --     enc_10_11_update_leds()
+    --     clock.sleep(a_time_per_step)
+    --   end
+
+    --   while util.time() < r_time_end do
+    --     enc_10_11_update_leds()
+    --     clock.sleep(r_time_per_step)
+    --   end
+
+    --   while crow_outputs[3] > 0 do
+    --     enc_10_11_update_leds()
+    --     clock.sleep(1/20)
+    --   end
+
+    --   enc_10_11_update_leds()
+    -- end)
+
+    local time_end = util.time() + time
+    local out = params:get("crow_env_out")
+    crow.output[out].query()
+
+    add_animator(10, function()
+      while util.time() < time_end do
+        enc_10_11_update_leds(out)
+        clock.sleep(1/20)
+      end
+
+      while crow_outputs[3] > 0 do
+        enc_10_11_update_leds(out)
+        clock.sleep(1/20)
+      end
+
+      enc_10_11_update_leds(out)
+    end)
+  end
+
+  -- ENC 11, crow env ratio
+  mft_handlers[enc_chan][11] = {}
+  mft_handlers[enc_chan][11].state = {}
+  mft_handlers[enc_chan][11].func = function(msg)
+    params:delta('crow_env_ratio', msg_delta(msg))
+    p_redraw()
+  end
+
+  table.insert(param_callbacks_3u['crow_env_ratio'], function(ratio)
+    -- local val = 63.5
+    -- val = val + (ratio - 0.5) / 0.5 * 63.5
+
+    -- range 0.01-.99 covers the range up to 4 leds in either direction from the center
+    -- furthest led is only lit when the ratio is at min (0) or max (1)
+    local val
+    if ratio == 0 then
+      val = 0
+    elseif ratio == 1 then
+      val = 127
+    else
+      val = 63.5 + (ratio - 0.5) / 0.5 * 52
+      val = math.floor(val + 0.5)
+    end
+
+    mft:cc(11, val, enc_chan)
+    mft:cc(11, val, enc_s_chan)
+  end)
+
+  -- ENC 11 SHIFT, nothing for now just prevents a switch short press
+  mft_handlers[enc_s_chan][11] = {}
+  mft_handlers[enc_s_chan][11].state = {
+    delta = 0
+  }
+  mft_handlers[enc_s_chan][11].func = function(msg)
+    local s = mft_handlers[enc_s_chan][11].state
+    local desensitivity = 5
+    -- local p_id = "some_param"
+
+    s.delta = s.delta + msg_delta(msg)
+
+    if s.delta % desensitivity == 0 then
+      if s.delta < 0 then
+        -- params:delta(p_id, -1)
+        s.delta = desensitivity - 1
+      elseif s.delta > 0 then
+        -- params:delta(p_id, 1)
+        s.delta = (desensitivity - 1) * -1
+      end
+
+      mft_handlers[switch_chan][11].state.enc_turned = true
+      p_redraw()
+    end
+  end
+
+  -- ENC 11 SWITCH, flip ratio around 0.5
+  mft_handlers[switch_chan][11] = {}
+  mft_handlers[switch_chan][11].state = {
+    pressed = false,
+    press_time = nil,
+    enc_turned = false
+  }
+  mft_handlers[switch_chan][11].func = function(msg)
+    local s = mft_handlers[switch_chan][11].state
+
+    if msg.val == 127 then -- pressed
+      s.pressed = true
+      s.press_time = util.time()
+      s.enc_turned = false
+      mft_handlers[enc_s_chan][11].delta = 0
+    elseif msg.val == 0 then -- released
+      s.pressed = false
+
+      -- if the encoder was turned, the press was for the encoder's shift
+      if not s.enc_turned then
+        local t = util.time()
+
+        if t - s.press_time >= .25 then -- long press
+
+        else -- short press
+          params:set("crow_env_ratio", 1 - params:get("crow_env_ratio"))
+        end
+      else
+      end
+
+      s.press_time = nil
+    else
+      error("msg.val was "..msg.val..", expected it to be 0 or 127")
+    end
+  end
 
   -- ENC 12, global tempo
   mft_handlers[enc_chan][12] = {}
@@ -1748,7 +2082,7 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
   mft_handlers[enc_s_chan][13].func = function(msg)
     local s = mft_handlers[enc_s_chan][13].state
     local desensitivity = 5
-    -- local p_id = "txo_cv_3_oct"
+    -- local p_id = "some_param"
 
     s.delta = s.delta + msg_delta(msg)
 
@@ -2158,8 +2492,10 @@ function add_animator(enc, func, behavior)
     elseif behavior == "ignore" then
       debug_msg("Tried to add animator to mft encoder "..enc>>", animator already present, ignoring")
       return
-    elseif behavior == "force" and mft_animators[enc].id then
-      clock.cancel(mft_animators[enc].id)
+    elseif behavior == "force" then
+      if mft_animators[enc].id then
+        clock.cancel(mft_animators[enc].id)
+      end
     else
       error("Invalid value for param `behavior`. Valid values are 'error', 'ignore', or 'force'")
     end
