@@ -1,4 +1,42 @@
 local mod = require 'core/mods'
+local util = require 'util'
+
+function tup()
+  include 'tools/tools'
+end
+
+-- local mft -- midi fighter twister midi device
+param_callbacks_3u = {}
+-- holds the voltage value of a crow output after a crow.output[n].query()
+-- need to init values because of tangled async code, should refactor to avoid this
+crow_outputs = {0, 0, 0, 0}
+
+params.params_add_saved_by_3u = params.add
+function params:add(p)
+  local p_action_saved = p.action
+
+  if p.action then
+    p.action = function(val)
+      p_action_saved(val)
+
+      for _,func in ipairs(param_callbacks_3u[p.id]) do
+        func(val)
+      end
+    end
+  else
+    p.action = function(val)
+      for _,func in ipairs(param_callbacks_3u[p.id]) do
+        func(val)
+      end
+    end
+  end
+
+  if p.id then
+    param_callbacks_3u[p.id] = {}
+  end
+
+  self:params_add_saved_by_3u(p)
+end
 
 function darken_buffer(buf, level)
   level = level or 1
@@ -19,7 +57,7 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
   -- paste the following into kakoune prompt to get number of params
   -- doesn't work anymore since i'm creating some params programmatically
   -- exec \%sparams:add\(<ret>:echo<space>%val{selection_count}<ret>
-  params:add_group("3u_patch_params", "3U PATCH", 75)
+  params:add_group("3u_patch_params", "3U PATCH", 79)
 
   -- allows keys and encoders to be mapped to nothing
   local empty_param = {
@@ -74,15 +112,15 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
   -- these clock params just expose relevant clock params next to the other params
   local clock_bpm = {
     id="clock_bpm",
-    name="clock bpm",
+    name="bpm @",
     type="control",
     controlspec=controlspec.def{
       min = 10,
-      max = 600,
+      max = 640,
       warp = 'exp',
       step = 0.1,
       default = norns.state.clock.tempo,
-      quantum = 0.2/590,
+      quantum = 0.2/630,
       wrap = false
     },
     formatter=function(param)
@@ -105,34 +143,60 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
   table.insert(mappable_params_3u, clock_bpm)
   params:add(clock_bpm)
 
+  -- local clock_bpm_x2 = {
+  --   id="clock_bpm_x2",
+  --   name="clock bpm x2",
+  --   type="control",
+  --   controlspec=controlspec.def{
+  --     min = 1,
+  --     max = 600,
+  --     warp = 'lin',
+  --     step = 0.1,
+  --     default = norns.state.clock.tempo,
+  --     quantum = 0.1/599,
+  --     wrap = false
+  --   },
+  --   formatter=function(val)
+  --     local bpm = params:get("clock_tempo")
+  --     params:set("clock_bpm_x2", bpm)
+  --     return bpm
+  --   end,
+  --   action=function(x)
+  --     local bpm = params:get("clock_tempo")
+  --     if x < bpm then
+  --       bpm = bpm / 2
+  --       params:set("clock_bpm", bpm)
+  --       params:set("clock_bpm_x2", bpm)
+  --     elseif x > bpm then -- increase
+  --       bpm = bpm * 2
+  --       params:set("clock_bpm", bpm)
+  --       params:set("clock_bpm_x2", bpm)
+  --     end
+  --   end
+  -- }
   local clock_bpm_x2 = {
     id="clock_bpm_x2",
-    name="clock bpm x2",
-    type="control",
-    controlspec=controlspec.def{
-      min = 1,
-      max = 600,
-      warp = 'lin',
-      step = 0.1,
-      default = norns.state.clock.tempo,
-      quantum = 0.1/599,
-      wrap = false
-    },
+    name="bpm x2 @",
+    type="number",
+    min=-1,
+    max=1,
+    default=0,
     formatter=function(val)
       local bpm = params:get("clock_tempo")
-      params:set("clock_bpm_x2", bpm)
+      -- params:set("clock_bpm_x2", bpm)
       return bpm
     end,
     action=function(x)
       local bpm = params:get("clock_tempo")
-      if x < bpm then
+
+      if x == -1 then
         bpm = bpm / 2
         params:set("clock_bpm", bpm)
-        params:set("clock_bpm_x2", bpm)
-      elseif x > bpm then -- increase
+        params:set("clock_bpm_x2", 0)
+      elseif x == 1 then
         bpm = bpm * 2
         params:set("clock_bpm", bpm)
-        params:set("clock_bpm_x2", bpm)
+        params:set("clock_bpm_x2", 0)
       end
     end
   }
@@ -260,18 +324,131 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
     end
   end
 
+  local txo_cv_3_note = {
+    id="txo_cv_3_note",
+    name="txo cv 3 note",
+    type="number",
+    min=-60,
+    max=60,
+    default=0,
+    action=function(n)
+      crow.ii.txo.cv_n(3, n)
+    end
+  }
+  params:add(txo_cv_3_note)
+
   local txo_cv_3_oct = {
     id="txo_cv_3_oct",
     name="txo cv 3 oct",
     type="number",
-    min=-3,
-    max=5,
+    min=-1,
+    max=1,
     default=0,
-    action=function(x)
-      crow.ii.txo.cv_n(3, 12 * x)
+    formatter=function(p)
+      return params:get("txo_cv_3_note")
+    end,
+    action=function(d)
+      -- local n = params:get("txo_cv_3_note")
+      -- if d == 1 then
+      --   n = n+12
+      -- elseif d == -1 then
+      -- end
+      params:set("txo_cv_3_note", params:get("txo_cv_3_note") + (d*12))
+      params:lookup_param("txo_cv_3_oct").value = 0
+      -- crow.ii.txo.cv_n(3, 12 * x)
     end
   }
   params:add(txo_cv_3_oct)
+
+  local txo_cv_3_fifths_octs = {
+    id="txo_cv_3_fifths_octs",
+    name="txo cv 3 fifths octs",
+    type="number",
+    min=-1,
+    max=1,
+    default=0,
+    formatter=function(p)
+      return params:get("txo_cv_3_note")
+    end,
+    action=function(d)
+      if d == 0 then
+        return
+      end
+
+      local n = params:get("txo_cv_3_note")
+      if n < 0 then
+        local oct = math.ceil(n / 12)
+        local oct_n = oct * 12
+        local off = n - oct_n
+
+        if off == 0 then
+          if d == 1 then
+            n = oct_n + 5
+          else
+            n = oct_n - 7
+          end
+        elseif off == -7 then
+          if d == 1 then
+            n = oct_n
+          else
+            n = oct_n - 12
+          end
+        elseif off > -7 then
+          if d == 1 then
+            n = oct_n
+          else
+            n = oct_n - 7
+          end
+        elseif off < -7 then
+          if d == 1 then
+            n = oct_n - 7
+          else
+            n = oct_n - 12
+          end
+        end
+      elseif n > 0 then
+        local oct = math.floor(n / 12)
+        local oct_n = oct * 12
+        local off = n - oct_n
+
+        if off == 0 then
+          if d == 1 then
+            n = oct_n + 7
+          else
+            n = oct_n - 5
+          end
+        elseif off == 7 then
+          if d == 1 then
+            n = oct_n + 12
+          else
+            n = oct_n
+          end
+        elseif off < 7 then
+          if d == 1 then
+            n = oct_n + 7
+          else
+            n = oct_n
+          end
+        elseif off > 7 then
+          if d == 1 then
+            n = oct_n + 12
+          else
+            n = oct_n + 7
+          end
+        end
+      else -- n == 0
+        if d == 1 then
+          n = 7
+        else
+          n = -7
+        end
+      end
+
+      params:set("txo_cv_3_note", n)
+      params:lookup_param("txo_cv_3_fifths_octs").value = 0
+    end
+  }
+  params:add(txo_cv_3_fifths_octs)
 
   -- this one is for mapping controllers to
   local txo_cv_3_oct_delta = {
@@ -404,6 +581,9 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
 
       -- local function for clock.run
       local function dofunc(z)
+        local out = params:get("crow_env_out")
+        local input = params:get("crow_env_in")
+
         if z == 1 then
         -- if z == 1 and not crow_env_init_3u then
           norns.crow.loadscript("3u-patch-companion/crow/env-public-vars.lua")
@@ -414,14 +594,12 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
           -- script is loaded, allow env params to set public vars
           crow_env_init_3u = true
 
-          local out = params:get("crow_env_out")
-          local input = params:get("crow_env_in")
           local amp = params:get("crow_env_amp")
           local retrig = params:string("crow_env_retrig_behavior")
-          local len = params:get("crow_env_time")
+          local time = params:get("crow_env_time")
           local ratio = params:get("crow_env_ratio")
-          local rise = len * ratio
-          local fall = len * (1 - ratio)
+          local rise = time * ratio
+          local fall = time * (1 - ratio)
           local rise_shape = params:string("crow_env_rise_shape")
           local fall_shape = params:string("crow_env_fall_shape")
           local start_stage = ""
@@ -438,6 +616,9 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
             crow.public.envactive = 0
           end
 
+          crow.output[out].receive = function(v) crow_outputs[out] = v end
+          crow.output[out].query()
+
           crow.input[input].mode('change', 1, 0.1, 'rising')
 
           if retrig == "no retrig" then
@@ -445,12 +626,14 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
               if crow.public.envactive == 0 then
                 crow.public.envactive = 1
                 crow.output[crow.public.envout]()
+                enc_10_11_env_animate(nil, nil)
               end
             end
           else
             crow.input[input].change = function()
               crow.public.envactive = 1
               crow.output[crow.public.envout]()
+              enc_10_11_env_animate(nil, nil)
             end
           end
 
@@ -472,6 +655,9 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
             end
           end
         elseif z == 0 then
+          -- reset offset
+          crow.cal.output[out].offset = crow_base_offset[out]
+
           params:lookup_param("crow_env_active").name = "○ crow env"
           params:hide("crow_env_time")
           params:hide("crow_env_ratio")
@@ -501,10 +687,11 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
       quantum = 0.01/(4-0.01),
       wrap = false
     },
-    action=function(len)
+    action=function(time)
       if crow_env_init_3u then
-        local rise = len * params:get("crow_env_ratio")
-        local fall = len * (1 - params:get("crow_env_ratio"))
+        local ratio = params:get("crow_env_ratio")
+        local rise = time * ratio + 0.0005
+        local fall = time * (1 - ratio)
         local out = params:get("crow_env_out")
         crow.output[out].dyn.rise = rise
         crow.output[out].dyn.fall = fall
@@ -532,19 +719,63 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
     },
     action=function(ratio)
       if crow_env_init_3u then
-        local rise = params:get("crow_env_time") * ratio
+        -- if ratio == 0 then
+          -- don't set ratio to true zero, this way ensures the envelope drops
+          -- to zero when using the "from zero" retrig behavior
+          -- ratio = 0.001
+        -- end
+        local time = params:get("crow_env_time")
+        -- don't set rise to true zero, this way ensures the envelope drops
+        -- to zero when using the "from zero" retrig behavior
+        local rise = time * ratio + 0.0005
         local fall = params:get("crow_env_time") * (1 - ratio)
         local out = params:get("crow_env_out")
         crow.output[out].dyn.rise = rise
         crow.output[out].dyn.fall = fall
       end
-    end
+    end,
+    -- formatter=function(param) return string.format("%.3f", param:get()) end
   }
   params:add(crow_env_ratio)
   if params:get("crow_env_active") == 0 then
     params:hide("crow_env_ratio")
     _menu.rebuild_params()
   end
+
+  -- my values for the cal offset of the outputs
+  -- need to figure out how to read these from norns
+  crow_base_offset = {}
+  crow_base_offset[1] = 0.02296516
+  crow_base_offset[2] = -0.005275138
+  crow_base_offset[3] = -0.003352082
+  crow_base_offset[4] = -0.003550681
+
+  local crow_env_offset ={
+    id="crow_env_offset",
+    name="crow env offset",
+    type="control",
+    controlspec=controlspec.def{
+      min = 0,
+      max = 10,
+      warp = 'lin',
+      step = 0.1,
+      default = 0,
+      quantum = 0.1/10,
+      wrap = false
+    },
+    action=function(offset)
+      -- if crow_env_init_3u then
+        local out = params:get("crow_env_out")
+        crow.cal.output[out].offset = crow_base_offset[out] + offset
+      -- end
+    end
+  }
+  params:add(crow_env_offset)
+  if params:get("crow_env_active") == 0 then
+    params:hide("crow_env_offset")
+    _menu.rebuild_params()
+  end
+
 
   local crow_env_amp = {
     id="crow_env_amp",
@@ -1345,6 +1576,990 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
   }
   params:add(draw_changes)
 
+  local mft_animate_param = {
+    id="mft_animate_3u",
+    name="animate MFT",
+    type="binary",
+    behavior="toggle",
+    default=1,
+    action=function(z)
+      if z == 0 then
+        for _,t in pairs(mft_animators) do
+          if t.id then
+            clock.cancel(t.id)
+            t.id = nil
+          end
+        end
+      else
+        for _,t in pairs(mft_animators) do
+          if not t.id then
+            t.id = clock.run(t.func)
+          end
+        end
+      end
+    end
+  }
+  params:add(mft_animate_param)
+  ----- BEGIN MIDI FIGHTER TWISTER (MFT) CONFIG -----
+  -- params:add_separator("mft_settings", "midi fighter twister")
+
+  mft_rgb_brightness_default = 35 -- ~equiv to value 100 in mft brightness config
+  mft_indicator_brightness_default = 75 -- ~equiv to value 100 in mft brightness config
+  mft_long_press_threshold = .1
+
+  -- key: number of indicator dots to be fully lit
+  -- value: the cc value that needs to be sent to an encoder configured in "blended bar" mode to light that many dots
+  local mft_ind_n_val = {}
+  mft_ind_n_val[0] = 0
+  mft_ind_n_val[1] = 12
+  mft_ind_n_val[2] = 23
+  mft_ind_n_val[3] = 35
+  mft_ind_n_val[4] = 46
+  mft_ind_n_val[5] = 58
+  mft_ind_n_val[6] = 69
+  mft_ind_n_val[7] = 81
+  mft_ind_n_val[8] = 92
+  mft_ind_n_val[9] = 104
+  mft_ind_n_val[10] = 115
+  mft_ind_n_val[11] = 127
+
+  -- key: number of indicator dots to be fully lit when an encoder is in detent (centered) and blended bar mode, where 0 is centered, positive is clockwise, negative is ccw
+  -- value: cc to send to encoder
+  local mft_ind_n_detent_val = {}
+  mft_ind_n_detent_val[-5] = 0
+  mft_ind_n_detent_val[-4] = 11
+  mft_ind_n_detent_val[-3] = 24
+  mft_ind_n_detent_val[-2] = 37
+  mft_ind_n_detent_val[-1] = 50
+  mft_ind_n_detent_val[0] = 63
+  mft_ind_n_detent_val[1] = 76
+  mft_ind_n_detent_val[2] = 89
+  mft_ind_n_detent_val[3] = 102
+  mft_ind_n_detent_val[4] = 115
+  mft_ind_n_detent_val[5] = 127
+
+  local mft_colors = {
+    normal = 0,
+    blue = 1,
+    light_blue = 15,
+    sky_blue = 30,
+    teal = 40,
+    green = 50,
+    lime = 60,
+    yellow = 65,
+    goldenrod = 70,
+    orange = 75,
+    lava_red = 80,
+    red = 85,
+    magenta = 90,
+    purple = 100,
+    periwinkle = 110,
+    soft_blue = 115,
+    ocean_blue = 120
+  }
+
+  local function mft_color(enc, color)
+    if type(color) == "string" then
+      color = mft_colors['color']
+    end
+
+    if not color then
+      error("color cannot be nil, or color name was not found in color table")
+    end
+
+    mft:cc(enc, color, 2)
+  end
+
+  -- given a "relative" midi msg with a value of 63 or 65, returns -1 or 1
+  -- value returned when passed other messages is undefined
+  local function msg_delta(msg)
+    return (64 - msg.val) * -1
+  end
+
+  -- performing a params:delta doesn't redraw param screen, native refresh rate is slow, manually redraw for smoother visuals when on param screen
+  local function p_redraw()
+    if _menu.mode then
+      _menu.rebuild_params()
+    end
+  end
+
+  -- local mft_port_param = {
+  --   id="mft_port",
+  --   name="port",
+  --   type="number",
+  --   min=0,
+  --   max=16,
+  --   default=1,
+  --   action=function(port)
+  --     if port ~= 0 then
+  --       mft = midi.connect(port)
+  --     end
+  --   end
+  -- }
+  -- params:add(mft_port_param)
+  mft = midi.connect(1)
+  if mft.name ~= "Midi Fighter Twister" then
+    mft = nil
+  end
+
+  -- mft_led_settings = {}
+
+  -- table of midi cc handlers, hiearchy is ch -> encoder num -> {func = function, state = {}}
+  mft_handlers = {}
+
+  local enc_chan = 1
+  local enc_s_chan = 5 -- "shift" channel when encoder is turned while pressed
+  local switch_chan = 2 -- channel for msg sent when encoder pressed/released (0/127)
+  mft_handlers[enc_chan] = {}
+  mft_handlers[enc_s_chan] = {}
+  mft_handlers[switch_chan] = {}
+
+  mft.event = function(data)
+    local msg = midi.to_msg(data)
+
+    local success, handler = pcall(function()
+      return mft_handlers[msg.ch][msg.cc].func
+    end)
+
+    if success and handler then
+      handler(msg)
+    end
+  end
+
+  -- template for a new mapping
+  -- mft_handlers[enc_chan][enc_num] = {}
+  -- mft_handlers[enc_chan][enc_num].state = {}
+  -- mft_handlers[enc_chan][enc_num].func = function(msg)
+  -- end
+
+  -- ENC 10, crow env time
+  mft_handlers[enc_chan][10] = {}
+  mft_handlers[enc_chan][10].state = {}
+  mft_handlers[enc_chan][10].func = function(msg)
+    params:delta('crow_env_time', msg_delta(msg))
+    p_redraw()
+  end
+
+  table.insert(param_callbacks_3u['crow_env_time'], function(time)
+    local min = 0.01
+    local max = 4
+    local f = (time - min) / (max - min)
+    local val = math.floor(f * 127 + 0.5)
+
+    mft:cc(10, val, enc_chan)
+  end)
+
+  -- ENC 10 SHIFT, crow env offset
+  mft_handlers[enc_s_chan][10] = {}
+  mft_handlers[enc_s_chan][10].state = {
+    delta = 0
+  }
+  mft_handlers[enc_s_chan][10].func = function(msg)
+    -- params:delta('crow_env_offset', msg_delta(msg))
+    -- p_redraw()
+
+    local s = mft_handlers[enc_s_chan][10].state
+    local desensitivity = 1
+    local p_id = 'crow_env_offset'
+
+    s.delta = s.delta + msg_delta(msg)
+
+    if s.delta % desensitivity == 0 then
+      if s.delta < 0 then
+        params:delta(p_id, -1)
+        s.delta = desensitivity - 1
+      elseif s.delta > 0 then
+        params:delta(p_id, 1)
+        s.delta = (desensitivity - 1) * -1
+      end
+
+      mft_handlers[switch_chan][10].state.enc_turned = true
+      p_redraw()
+    end
+  end
+
+  table.insert(param_callbacks_3u['crow_env_offset'], function(offset)
+    local min = 0
+    local max = 10
+    local f = (offset - min) / (max - min)
+    local val = math.floor(f * 127 + 0.5)
+
+    mft:cc(10, val, enc_s_chan)
+    enc_10_11_update_leds()
+  end)
+
+  -- ENC 10 SWITCH, trigger envelope
+  mft_handlers[switch_chan][10] = {}
+  mft_handlers[switch_chan][10].state = {
+    pressed = false,
+    press_time = nil,
+    enc_turned = false
+  }
+  mft_handlers[switch_chan][10].func = function(msg)
+    local s = mft_handlers[switch_chan][10].state
+    local out = params:get("crow_env_out")
+
+    if msg.val == 127 then -- pressed
+      s.pressed = true
+      s.press_time = util.time()
+      s.enc_turned = false
+      mft_handlers[enc_s_chan][10].delta = 0
+    elseif msg.val == 0 then -- released
+      s.pressed = false
+
+      -- if the encoder was turned, the press was for the encoder's shift
+      if not s.enc_turned then
+        local t = util.time()
+
+        if t - s.press_time >= .25 then -- long press
+
+        else -- short press, trigger envelope
+          crow.output[out]()
+          enc_10_11_env_animate(nil, nil, out)
+        end
+      else
+      end
+
+      s.press_time = nil
+    else
+      error("msg.val was "..msg.val..", expected it to be 0 or 127")
+    end
+  end
+
+  function enc_10_11_update_leds(out)
+    out = out or params:get('crow_env_out')
+    crow.output[out].query()
+
+    local range = mft_rgb_brightness_default - 17
+    local offset = params:get("crow_env_offset")
+    local val
+
+    if params:get("mft_animate_3u") == 1 then
+      val = 17 + range * ((crow_outputs[out] + offset) / 8)
+    else
+      val = 17 + range * (offset / 8)
+    end
+
+    val = math.floor(val + 0.5)
+    val = math.min(val, mft_rgb_brightness_default)
+
+    mft:cc(10, val, 3)
+    mft:cc(11, val, 3)
+  end
+
+  function enc_10_11_env_animate(time, ratio)
+    if params:get("mft_animate_3u") == 0 then
+      return
+    end
+
+    time = time or params:get('crow_env_time')
+    ratio = ratio or params:get('crow_env_ratio')
+
+    -- only redraw as fast as is necessary for smoothly changing brightness
+    -- local a_time = time * ratio
+    -- local r_time = time - a_time
+    -- local range = mft_rgb_brightness_default - 17
+    -- local a_time_per_step = a_time/range
+    -- local r_time_per_step = r_time/range
+    -- if a_time_per_step < 1/30 then
+    --   a_time_per_step = 1/30
+    -- end
+    -- if r_time_per_step < 1/30 then
+    --   r_time_per_step = 1/30
+    -- end
+    -- local a_time_end = util.time() + a_time
+    -- local r_time_end = a_time_end + r_time
+
+    -- add_animator(10, function()
+    --   while util.time() < a_time_end do
+    --     enc_10_11_update_leds()
+    --     clock.sleep(a_time_per_step)
+    --   end
+
+    --   while util.time() < r_time_end do
+    --     enc_10_11_update_leds()
+    --     clock.sleep(r_time_per_step)
+    --   end
+
+    --   while crow_outputs[3] > 0 do
+    --     enc_10_11_update_leds()
+    --     clock.sleep(1/20)
+    --   end
+
+    --   enc_10_11_update_leds()
+    -- end)
+
+    local time_end = util.time() + time
+    local out = params:get("crow_env_out")
+    crow.output[out].query()
+
+    add_animator(10, function()
+      while util.time() < time_end do
+        enc_10_11_update_leds(out)
+        clock.sleep(1/20)
+      end
+
+      while crow_outputs[3] > 0 do
+        enc_10_11_update_leds(out)
+        clock.sleep(1/20)
+      end
+
+      enc_10_11_update_leds(out)
+    end)
+  end
+
+  -- ENC 11, crow env ratio
+  mft_handlers[enc_chan][11] = {}
+  mft_handlers[enc_chan][11].state = {}
+  mft_handlers[enc_chan][11].func = function(msg)
+    params:delta('crow_env_ratio', msg_delta(msg))
+    p_redraw()
+  end
+
+  table.insert(param_callbacks_3u['crow_env_ratio'], function(ratio)
+    -- local val = 63.5
+    -- val = val + (ratio - 0.5) / 0.5 * 63.5
+
+    -- range 0.01-.99 covers the range up to 4 leds in either direction from the center
+    -- furthest led is only lit when the ratio is at min (0) or max (1)
+    local val
+    if ratio == 0 then
+      val = 0
+    elseif ratio == 1 then
+      val = 127
+    else
+      val = 63.5 + (ratio - 0.5) / 0.5 * 52
+      val = math.floor(val + 0.5)
+    end
+
+    mft:cc(11, val, enc_chan)
+    mft:cc(11, val, enc_s_chan)
+  end)
+
+  -- ENC 11 SHIFT, nothing for now just prevents a switch short press
+  mft_handlers[enc_s_chan][11] = {}
+  mft_handlers[enc_s_chan][11].state = {
+    delta = 0
+  }
+  mft_handlers[enc_s_chan][11].func = function(msg)
+    local s = mft_handlers[enc_s_chan][11].state
+    local desensitivity = 5
+    -- local p_id = "some_param"
+
+    s.delta = s.delta + msg_delta(msg)
+
+    if s.delta % desensitivity == 0 then
+      if s.delta < 0 then
+        -- params:delta(p_id, -1)
+        s.delta = desensitivity - 1
+      elseif s.delta > 0 then
+        -- params:delta(p_id, 1)
+        s.delta = (desensitivity - 1) * -1
+      end
+
+      mft_handlers[switch_chan][11].state.enc_turned = true
+      p_redraw()
+    end
+  end
+
+  -- ENC 11 SWITCH, flip ratio around 0.5
+  mft_handlers[switch_chan][11] = {}
+  mft_handlers[switch_chan][11].state = {
+    pressed = false,
+    press_time = nil,
+    enc_turned = false
+  }
+  mft_handlers[switch_chan][11].func = function(msg)
+    local s = mft_handlers[switch_chan][11].state
+
+    if msg.val == 127 then -- pressed
+      s.pressed = true
+      s.press_time = util.time()
+      s.enc_turned = false
+      mft_handlers[enc_s_chan][11].delta = 0
+    elseif msg.val == 0 then -- released
+      s.pressed = false
+
+      -- if the encoder was turned, the press was for the encoder's shift
+      if not s.enc_turned then
+        local t = util.time()
+
+        if t - s.press_time >= .25 then -- long press
+
+        else -- short press
+          params:set("crow_env_ratio", 1 - params:get("crow_env_ratio"))
+        end
+      else
+      end
+
+      s.press_time = nil
+    else
+      error("msg.val was "..msg.val..", expected it to be 0 or 127")
+    end
+  end
+
+  -- ENC 12, global tempo
+  mft_handlers[enc_chan][12] = {}
+  mft_handlers[enc_chan][12].state = {
+    led_on = 1
+  }
+  mft_handlers[enc_chan][12].func = function(msg)
+    params:delta("clock_bpm", msg_delta(msg) * 2)
+    p_redraw()
+  end
+
+  local function update_enc_12_led(bpm)
+    local range
+    local min
+
+    if bpm <= 40 then -- 10-40
+      min = 10
+      range = 30
+      mft:cc(12, mft_colors['red'], 2)
+    elseif bpm <= 160 then -- 41-160
+      min = 41
+      range = 119
+      mft:cc(12, 0, 2) -- revert to normal color
+    else -- 161-640
+      min = 161
+      range = 439
+      mft:cc(12, mft_colors['periwinkle'], 2)
+    end
+
+    local f = (bpm - min) / range
+    local v = math.floor(127 * f + 0.5)
+
+    -- update indicator level for both regular and shift encoder
+    mft:cc(12, v, enc_chan)
+    mft:cc(12, v, enc_s_chan)
+  end
+  table.insert(param_callbacks_3u['clock_bpm'], update_enc_12_led)
+  -- led pulses to clock, 1 pulse per beat
+  -- not using because seems to have clock capped
+  -- mft:cc(12, 13, 3)
+
+  -- led pulser, 1 pulse per beat
+  add_animator(12, function()
+    while true do
+      clock.sync(1)
+      mft:cc(12, 17, 3)
+      -- clock.sync(1/8)
+      clock.sleep(0.01)
+      mft:cc(12, mft_rgb_brightness_default, 3)
+    end
+  end)
+
+  -- ENC 12 SHIFT, global tempo x2
+  mft_handlers[enc_s_chan][12] = {}
+  mft_handlers[enc_s_chan][12].state = {
+    delta = 0
+  }
+  mft_handlers[enc_s_chan][12].func = function(msg)
+    local s = mft_handlers[enc_s_chan][12].state
+    local desensitivity = 5
+    local p_id = "clock_bpm_x2"
+
+    s.delta = s.delta + msg_delta(msg)
+
+    if s.delta % desensitivity == 0 then
+      if s.delta < 0 then
+        params:delta(p_id, -1)
+        s.delta = desensitivity - 1
+      elseif s.delta > 0 then
+        params:delta(p_id, 1)
+        s.delta = (desensitivity - 1) * -1
+      end
+
+      p_redraw()
+    end
+  end
+
+  -- ENC 13 ansible clock (txo tr 4)
+  mft_handlers[enc_chan][13] = {}
+  mft_handlers[enc_chan][13].state = {
+    delta = 0
+  }
+  mft_handlers[enc_chan][13].func = function(msg)
+    local s = mft_handlers[enc_chan][13].state
+    local desensitivity = 5
+    local p_id = "clock_txo_tr_4_div_x2"
+
+    s.delta = s.delta + msg_delta(msg)
+
+    if s.delta % desensitivity == 0 then
+      if s.delta < 0 then
+        params:delta(p_id, -1)
+        s.delta = desensitivity - 1
+      elseif s.delta > 0 then
+        params:delta(p_id, 1)
+        s.delta = (desensitivity - 1) * -1
+      end
+
+      p_redraw()
+    end
+  end
+
+  local function update_enc_13_animator(div, z)
+    div = div or params:get('clock_txo_tr_4_div')
+    z = z or params:get('clock_txo_tr_4')
+
+    if z == 0 then
+      remove_animator(13)
+    else
+      add_animator(13, function()
+        local function dark_blink() end
+
+        if clock.get_beat_sec() / (div * 8) < 0.01 then
+          dark_blink = function()
+            clock.sync(1/(div*8))
+          end
+        else
+          dark_blink = function()
+            clock.sleep(0.01)
+          end
+        end
+
+        while true do
+          clock.sync(1/div)
+          mft:cc(13, 17, 3)
+          -- clock.sync(1/(div*8))
+          -- clock.sleep(0.01)
+          dark_blink()
+          mft:cc(13, mft_rgb_brightness_default, 3)
+        end
+      end, "force")
+    end
+  end
+
+  table.insert(param_callbacks_3u['clock_txo_tr_4_div'], function(div)
+    local val
+    local color = 0
+
+    -- usually will be power of 2
+    if div == 1 then
+      val = mft_ind_n_val[1]
+    elseif div == 2 then
+      val = mft_ind_n_val[2]
+    elseif div == 4 then
+      val = mft_ind_n_val[4]
+    elseif div == 8 then
+      val = mft_ind_n_val[6]
+    elseif div == 16 then
+      val = mft_ind_n_val[7]
+    elseif div == 32 then
+      val = mft_ind_n_val[8]
+    elseif div == 64 then
+      val = mft_ind_n_val[9]
+    elseif div == 128 then
+      val = mft_ind_n_val[10]
+    elseif div == 256 then
+      val = mft_ind_n_val[11]
+    else
+      color = mft_colors['soft_blue']
+
+      if 5 <= div and div <= 11 then
+        val = mft_ind_n_val[div]
+      else
+        val = 0
+      end
+    end
+
+    update_enc_13_animator(div)
+    mft:cc(13, color, 2)
+    mft:cc(13, val, enc_chan)
+    mft:cc(13, val, enc_s_chan)
+  end)
+
+  table.insert(param_callbacks_3u['clock_txo_tr_4'], function(z)
+    local rgb_brightness
+    local ind_brightness
+
+    if z == 0 then
+      rgb_brightness = 17
+      ind_brightness = 65
+    else
+      rgb_brightness = mft_rgb_brightness_default
+      ind_brightness = mft_indicator_brightness_default
+    end
+
+    clock.run(function()
+      mft:cc(13, rgb_brightness, 3)
+      -- for some reason fails without this sleep, only 2nd command takes effect
+      clock.sleep(0.01)
+      mft:cc(13, ind_brightness, 3)
+    end)
+
+    update_enc_13_animator(nil, z)
+  end)
+
+  -- ENC 13 shift, nothing for now just prevents a switch short press
+  mft_handlers[enc_s_chan][13] = {}
+  mft_handlers[enc_s_chan][13].state = {
+    delta = 0
+  }
+  mft_handlers[enc_s_chan][13].func = function(msg)
+    local s = mft_handlers[enc_s_chan][13].state
+    local desensitivity = 5
+    -- local p_id = "some_param"
+
+    s.delta = s.delta + msg_delta(msg)
+
+    if s.delta % desensitivity == 0 then
+      if s.delta < 0 then
+        -- params:delta(p_id, -1)
+        s.delta = desensitivity - 1
+      elseif s.delta > 0 then
+        -- params:delta(p_id, 1)
+        s.delta = (desensitivity - 1) * -1
+      end
+
+      mft_handlers[switch_chan][13].state.enc_turned = true
+      p_redraw()
+    end
+  end
+
+  -- ENC 13 SWITCH, enable/disable txo tr 4 clock
+  mft_handlers[switch_chan][13] = {}
+  mft_handlers[switch_chan][13].state = {
+    pressed = false,
+    press_time = nil,
+    enc_turned = false -- set if the encoder is turned while pressed
+  }
+  mft_handlers[switch_chan][13].func = function(msg)
+    local s = mft_handlers[switch_chan][13].state
+
+    if msg.val == 127 then -- pressed
+      s.pressed = true
+      s.press_time = util.time()
+      s.enc_turned = false
+      mft_handlers[enc_s_chan][13].delta = 0
+    elseif msg.val == 0 then -- released
+      s.pressed = false
+
+      -- if the encoder was turned, the press was for the encoder's shift
+      if not s.enc_turned then
+        local t = util.time()
+
+        if t - s.press_time >= .25 then -- long press
+
+        else -- short press
+          params:set("clock_txo_tr_4", 1 - params:get("clock_txo_tr_4"))
+        end
+      else
+      end
+
+      s.press_time = nil
+    else
+      error("msg.val was "..msg.val..", expected it to be 0 or 127")
+    end
+  end
+
+  -- ENC 14 beads seed clock (txo tr 3)
+  mft_handlers[enc_chan][14] = {}
+  mft_handlers[enc_chan][14].state = {
+    delta = 0
+  }
+  mft_handlers[enc_chan][14].func = function(msg)
+    local s = mft_handlers[enc_chan][14].state
+    local desensitivity = 5
+    local p_id = "clock_txo_tr_3_div_x2"
+
+    s.delta = s.delta + msg_delta(msg)
+
+    if s.delta % desensitivity == 0 then
+      if s.delta < 0 then
+        params:delta(p_id, -1)
+        s.delta = desensitivity - 1
+      elseif s.delta > 0 then
+        params:delta(p_id, 1)
+        s.delta = (desensitivity - 1) * -1
+      end
+
+      p_redraw()
+    end
+  end
+
+  local function update_enc_14_animator(div, z)
+    div = div or params:get('clock_txo_tr_3_div')
+    z = z or params:get('clock_txo_tr_3')
+
+    if z == 0 then
+      remove_animator(14)
+    else
+      add_animator(14, function()
+        local function dark_blink() end
+
+        if clock.get_beat_sec() / (div * 8) < 0.01 then
+          dark_blink = function()
+            clock.sync(1/(div*8))
+          end
+        else
+          dark_blink = function()
+            clock.sleep(0.01)
+          end
+        end
+
+        while true do
+          clock.sync(1/div)
+          mft:cc(14, 17, 3)
+          -- clock.sync(1/(div*8))
+          -- clock.sleep(0.01)
+          dark_blink()
+          mft:cc(14, mft_rgb_brightness_default, 3)
+        end
+      end, "force")
+    end
+  end
+
+  table.insert(param_callbacks_3u['clock_txo_tr_3_div'], function(div)
+    local val
+    local color = 0
+
+    -- usually will be power of 2
+    if div == 1 then
+      val = mft_ind_n_val[1]
+    elseif div == 2 then
+      val = mft_ind_n_val[2]
+    elseif div == 4 then
+      val = mft_ind_n_val[4]
+    elseif div == 8 then
+      val = mft_ind_n_val[6]
+    elseif div == 16 then
+      val = mft_ind_n_val[7]
+    elseif div == 32 then
+      val = mft_ind_n_val[8]
+    elseif div == 64 then
+      val = mft_ind_n_val[9]
+    elseif div == 128 then
+      val = mft_ind_n_val[10]
+    elseif div == 256 then
+      val = mft_ind_n_val[11]
+    else
+      color = mft_colors['soft_blue']
+
+      if 5 <= div and div <= 11 then
+        val = mft_ind_n_val[div]
+      else
+        val = 0
+      end
+    end
+
+    update_enc_14_animator(div)
+    mft:cc(14, color, 2)
+    mft:cc(14, val, enc_chan)
+    mft:cc(14, val, enc_s_chan)
+  end)
+
+  table.insert(param_callbacks_3u['clock_txo_tr_3'], function(z)
+    local rgb_brightness
+    local ind_brightness
+
+    if z == 0 then
+      rgb_brightness = 17
+      ind_brightness = 65
+    else
+      rgb_brightness = mft_rgb_brightness_default
+      ind_brightness = mft_indicator_brightness_default
+    end
+
+    clock.run(function()
+      mft:cc(14, rgb_brightness, 3)
+      -- for some reason fails without this sleep, only 2nd command takes effect
+      clock.sleep(0.01)
+      mft:cc(14, ind_brightness, 3)
+    end)
+
+    update_enc_14_animator(nil, z)
+  end)
+
+  -- ENC 14 shift, nothing for now just prevents a switch short press
+  mft_handlers[enc_s_chan][14] = {}
+  mft_handlers[enc_s_chan][14].state = {
+    delta = 0
+  }
+  mft_handlers[enc_s_chan][14].func = function(msg)
+    local s = mft_handlers[enc_s_chan][14].state
+    local desensitivity = 5
+    -- local p_id = "txo_cv_3_oct"
+
+    s.delta = s.delta + msg_delta(msg)
+
+    if s.delta % desensitivity == 0 then
+      if s.delta < 0 then
+        -- params:delta(p_id, -1)
+        s.delta = desensitivity - 1
+      elseif s.delta > 0 then
+        -- params:delta(p_id, 1)
+        s.delta = (desensitivity - 1) * -1
+      end
+
+      mft_handlers[switch_chan][14].state.enc_turned = true
+      p_redraw()
+    end
+  end
+
+  -- ENC 14 SWITCH, enable/disable txo tr 3 clock
+  mft_handlers[switch_chan][14] = {}
+  mft_handlers[switch_chan][14].state = {
+    pressed = false,
+    press_time = nil,
+    enc_turned = false -- set if the encoder is turned while pressed
+  }
+  mft_handlers[switch_chan][14].func = function(msg)
+    local s = mft_handlers[switch_chan][14].state
+
+    if msg.val == 127 then -- pressed
+      s.pressed = true
+      s.press_time = util.time()
+      s.enc_turned = false
+      mft_handlers[enc_s_chan][14].delta = 0
+    elseif msg.val == 0 then -- released
+      s.pressed = false
+
+      -- if the encoder was turned, the press was for the encoder's shift
+      if not s.enc_turned then
+        local t = util.time()
+
+        if t - s.press_time >= .25 then -- long press
+
+        else -- short press
+          params:set("clock_txo_tr_3", 1 - params:get("clock_txo_tr_3"))
+        end
+      else
+      end
+
+      s.press_time = nil
+    else
+      error("msg.val was "..msg.val..", expected it to be 0 or 127")
+    end
+  end
+
+  -- ENC 15, beads octave (txo cv 3)
+  mft_handlers[enc_chan][15] = {}
+  mft_handlers[enc_chan][15].state = {
+    delta = 0
+  }
+  mft_handlers[enc_chan][15].func = function(msg)
+    local s = mft_handlers[enc_chan][15].state
+    local desensitivity = 5
+    local p_id = "txo_cv_3_oct"
+
+    s.delta = s.delta + msg_delta(msg)
+
+    -- if delta reaches the threshold, do param delta and set internal delta to the next "step" (at the edge of range, next to the threshold that was just crossed)
+    if s.delta % desensitivity == 0 then
+      if s.delta < 0 then
+        params:delta(p_id, -1)
+        s.delta = desensitivity - 1
+      elseif s.delta > 0 then
+        params:delta(p_id, 1)
+        s.delta = (desensitivity - 1) * -1
+      end
+
+      p_redraw()
+    end
+  end
+
+  table.insert(param_callbacks_3u['txo_cv_3_note'], function(n)
+    local val
+    local color
+    local oct
+    local off
+
+    if n <= 0 then
+      oct = math.ceil(n / 12)
+      off = n - (oct * 12)
+    elseif n > 0 then
+      oct = math.floor(n / 12)
+      off = n - (oct * 12)
+    end
+
+    if off == 0 then
+      color = mft_colors['normal']
+      val = mft_ind_n_detent_val[oct]
+    elseif off == 7 then
+      color = mft_colors['lava_red']
+      val =  mft_ind_n_detent_val[oct] + 6
+    elseif off == -7 then
+      color = mft_colors['lava_red']
+      val =  mft_ind_n_detent_val[oct] - 6
+    elseif off > 0 then
+      color = mft_colors['magenta']
+      val =  mft_ind_n_detent_val[oct] + off
+    elseif off < 0 then
+      color = mft_colors['magenta']
+      val =  mft_ind_n_detent_val[oct] - off
+    end
+
+    -- update indicator level for both regular and shift encoder
+    mft:cc(15, val, enc_chan)
+    mft:cc(15, val, enc_s_chan)
+    mft:cc(15, color, 2)
+  end)
+
+  -- ENC 15 SHIFT, beads fifths and octaves (txo cv 3)
+  mft_handlers[enc_s_chan][15] = {}
+  mft_handlers[enc_s_chan][15].state = {
+    delta = 0
+  }
+  mft_handlers[enc_s_chan][15].func = function(msg)
+    local s = mft_handlers[enc_s_chan][15].state
+    local desensitivity = 3
+    local p_id = "txo_cv_3_fifths_octs"
+
+    s.delta = s.delta + msg_delta(msg)
+
+    if s.delta % desensitivity == 0 then
+      if s.delta < 0 then
+        params:delta(p_id, -1)
+        s.delta = desensitivity - 1
+      elseif s.delta > 0 then
+        params:delta(p_id, 1)
+        s.delta = (desensitivity - 1) * -1
+      end
+
+      mft_handlers[switch_chan][15].state.enc_turned = true
+      p_redraw()
+    end
+  end
+
+  -- ENC 15 SWITCH
+  mft_handlers[switch_chan][15] = {}
+  mft_handlers[switch_chan][15].state = {
+    pressed = false,
+    press_time = nil,
+    enc_turned = false -- set if the encoder is turned while pressed
+  }
+  mft_handlers[switch_chan][15].func = function(msg)
+    local s = mft_handlers[switch_chan][15].state
+
+    if msg.val == 127 then -- pressed
+      s.pressed = true
+      s.press_time = util.time()
+      s.enc_turned = false
+      mft_handlers[enc_s_chan][15].delta = 0
+    elseif msg.val == 0 then -- released
+      s.pressed = false
+
+      -- if the encoder was turned, the press was for the encoder's shift
+      if not s.enc_turned then
+        local t = util.time()
+
+        if t - s.press_time >= .25 then -- long press
+
+        else -- short press
+          params:set("txo_cv_3_note", 0)
+        end
+      else
+      end
+
+      s.press_time = nil
+    else
+      error("msg.val was "..msg.val..", expected it to be 0 or 127")
+    end
+  end
+
+  ----- END MIDI FIGHTER TWISTER (MFT) CONFIG -----
   params:default()
   params:bang()
 end)
@@ -1457,4 +2672,77 @@ function restore_redraw(redraw_func)
     end
   end, 1/10)
   redraw_restore_metro:start()
+end
+
+----- BEGIN MFT LED ANIMATION SYSTEM -----
+mft_animators = {}
+-- for i=0,15 do
+--   mft_animators[i] = {}
+-- end
+
+-- "behavior" can be 'error', 'ignore', or 'force'
+function add_animator(enc, func, behavior)
+  behavior = behavior or "force"
+
+  if mft_animators[enc] ~= nil then
+    if behavior == "error" then
+      error("Failed to add animator to mft encoder "..enc..", animator already present")
+    elseif behavior == "ignore" then
+      debug_msg("Tried to add animator to mft encoder "..enc>>", animator already present, ignoring")
+      return
+    elseif behavior == "force" then
+      if mft_animators[enc].id then
+        clock.cancel(mft_animators[enc].id)
+      end
+    else
+      error("Invalid value for param `behavior`. Valid values are 'error', 'ignore', or 'force'")
+    end
+  end
+
+  local t = {
+    func = func
+  }
+
+  if params:get("mft_animate_3u") == 1 then
+    t.id = clock.run(func)
+  end
+
+  mft_animators[enc] = t
+end
+
+function remove_animator(enc)
+  local anim_t = mft_animators[enc]
+
+  if anim_t and anim_t.id then
+    clock.cancel(anim_t.id)
+  end
+
+  mft_animators[enc] = nil
+end
+
+function enable_animate(enc, state)
+  state = state or true
+
+  local anim_t = mft_animators[enc]
+
+  if state then
+    if params:get("mft_animate_3u") ~= 1 then
+      debug_msg("attempted to enable mft animation on encoder "..enc.." while the mft_animate param was false")
+    elseif anim_t and not anim_t.id then
+      anim_t.id = clock.run(anim_t.func)
+    end
+  else
+    if anim_t and anim_t.id then
+      clock.cancel(anim_t.id)
+      anim_t.id = nil
+    end
+  end
+end
+----- END MFT LED ANIMATION SYSTEM -----
+
+debug_3u = true
+function debug_msg(s)
+  if debug_3u then
+    print("debug: "..s)
+  end
 end
