@@ -712,9 +712,9 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
       min = 0,
       max = 1,
       warp = 'lin',
-      step = 0.01,
+      step = 0.001,
       default = 0.1,
-      quantum = 0.01,
+      quantum = 0.001,
       wrap = false
     },
     action=function(ratio)
@@ -734,7 +734,7 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
         crow.output[out].dyn.fall = fall
       end
     end,
-    -- formatter=function(param) return string.format("%.3f", param:get()) end
+    formatter=function(param) return string.format("%.3f", param:get()) end
   }
   params:add(crow_env_ratio)
   if params:get("crow_env_active") == 0 then
@@ -1710,9 +1710,11 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
   local enc_chan = 1
   local enc_s_chan = 5 -- "shift" channel when encoder is turned while pressed
   local switch_chan = 2 -- channel for msg sent when encoder pressed/released (0/127)
+  local side_chan = 4 -- channel for side buttons
   mft_handlers[enc_chan] = {}
   mft_handlers[enc_s_chan] = {}
   mft_handlers[switch_chan] = {}
+  mft_handlers[side_chan] = {}
 
   mft.event = function(data)
     local msg = midi.to_msg(data)
@@ -1731,6 +1733,92 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
   -- mft_handlers[enc_chan][enc_num].state = {}
   -- mft_handlers[enc_chan][enc_num].func = function(msg)
   -- end
+
+  -- side buttons are on channel 4, cc 8-13 top to bottom then l to r, 127 press 0 rel
+  -- for now, assigning same functions to the side buttons on opposite sides
+  -- SIDE BUTTONS 8 & 11, reset ansible
+  mft_handlers[side_chan][8] = {}
+  mft_handlers[side_chan][8].state = {
+    pressed = false,
+    press_time = nil,
+    enc_turned = false
+  }
+  mft_handlers[side_chan][8].func = function(msg)
+    local s = mft_handlers[side_chan][8].state
+
+    if msg.val == 127 then -- pressed
+      s.pressed = true
+      s.press_time = util.time()
+      s.enc_turned = false
+      params:set("reset_ansible", 1)
+    else -- released
+      s.pressed = false
+      s.press_time = nil
+    end
+  end
+
+  mft_handlers[side_chan][11] = {}
+  mft_handlers[side_chan][11].state = {
+    pressed = false,
+    press_time = nil,
+    enc_turned = false
+  }
+  mft_handlers[side_chan][11].func = function(msg)
+    local s = mft_handlers[side_chan][11].state
+
+    if msg.val == 127 then -- pressed
+      s.pressed = true
+      s.press_time = util.time()
+      s.enc_turned = false
+      params:set("reset_ansible", 1)
+    else -- released
+      s.pressed = false
+      s.press_time = nil
+    end
+  end
+
+  -- SIDE BUTTONS 9 & 12, bang params
+  mft_handlers[side_chan][9] = {}
+  mft_handlers[side_chan][9].state = {
+    pressed = false,
+    press_time = nil,
+    enc_turned = false
+  }
+  mft_handlers[side_chan][9].func = function(msg)
+    local s = mft_handlers[side_chan][9].state
+
+    if msg.val == 127 then -- pressed
+      s.pressed = true
+      s.press_time = util.time()
+      s.enc_turned = false
+      params:bang()
+    else -- released
+      s.pressed = false
+      s.press_time = nil
+    end
+  end
+
+  mft_handlers[side_chan][12] = {}
+  mft_handlers[side_chan][12].state = {
+    pressed = false,
+    press_time = nil,
+    enc_turned = false
+  }
+  mft_handlers[side_chan][12].func = function(msg)
+    local s = mft_handlers[side_chan][12].state
+
+    if msg.val == 127 then -- pressed
+      s.pressed = true
+      s.press_time = util.time()
+      s.enc_turned = false
+      params:bang()
+    else -- released
+      s.pressed = false
+      s.press_time = nil
+    end
+  end
+
+  -- ENC 9, wsyn fm ratio
 
   -- ENC 10, crow env time
   mft_handlers[enc_chan][10] = {}
@@ -1908,11 +1996,29 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
     end)
   end
 
+  local function ratio_to_sensitivity(ratio)
+    local s = 1
+    if ratio <= 0.01 or ratio >= .99 then
+      s = 1
+    elseif ratio <= 0.02 or ratio >= .98 then
+      s = 2
+    else
+      s = 10
+    end
+
+    return s
+  end
+
   -- ENC 11, crow env ratio
   mft_handlers[enc_chan][11] = {}
-  mft_handlers[enc_chan][11].state = {}
+  mft_handlers[enc_chan][11].state = {
+    sensitivity = ratio_to_sensitivity(params:get("crow_env_ratio"))
+  }
   mft_handlers[enc_chan][11].func = function(msg)
-    params:delta('crow_env_ratio', msg_delta(msg))
+    local s = mft_handlers[enc_chan][11].state
+    s.sensitivity = ratio_to_sensitivity(params:get("crow_env_ratio"))
+
+    params:delta('crow_env_ratio', msg_delta(msg) * s.sensitivity)
     p_redraw()
   end
 
