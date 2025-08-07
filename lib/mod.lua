@@ -57,7 +57,7 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
   -- paste the following into kakoune prompt to get number of params
   -- doesn't work anymore since i'm creating some params programmatically
   -- exec \%sparams:add\(<ret>:echo<space>%val{selection_count}<ret>
-  params:add_group("3u_patch_params", "3U PATCH", 79)
+  params:add_group("3u_patch_params", "3U PATCH", 80)
 
   -- allows keys and encoders to be mapped to nothing
   local empty_param = {
@@ -1101,17 +1101,64 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
   table.insert(mappable_params_3u, wsyn_fm_env)
   params:add(wsyn_fm_env)
 
-  local wsyn_fm_ratio = {
+  -- local wsyn_fm_ratio = {
+  --   id="wsyn_fm_ratio",
+  --   name="wsyn fm ratio",
+  --   type="number",
+  --   min=1,
+  --   max=20,
+  --   default=4,
+  --   action=function(x) crow.ii.wsyn.fm_ratio(x) end
+  -- }
+  -- table.insert(mappable_params_3u, wsyn_fm_ratio)
+  -- params:add(wsyn_fm_ratio)
+
+  local function parse_fraction(fraction_str)
+    local n, d = fraction_str:match("([^/]+)/([^/]+)")
+    if n and d then
+      return tonumber(n) / tonumber(d)
+    else
+      return tonumber(fraction_str)
+    end
+  end
+
+  wsyn_ratios ={"19/3", "17/4", "15/4", "13/2", "13/3", "11/2", "11/3", "9/2", "7/2", "7/3", "5/2", "3/2", -- 12 elements up to here
+  "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20"}
+  wsyn_ratios_spicy = {8/3, 5/3, 19/4}
+  local wsyn_fm_ratio =  {
     id="wsyn_fm_ratio",
     name="wsyn fm ratio",
-    type="number",
-    min=1,
-    max=24,
-    default=4,
-    action=function(x) crow.ii.wsyn.fm_ratio(x) end
+    type="option",
+    options=wsyn_ratios,
+    default = 16, -- 4
+    action= function(i)
+      local r = parse_fraction(wsyn_ratios[i])
+      local d = 2^params:get("wsyn_fm_ratio_div_exp")
+      crow.ii.wsyn.fm_ratio(r/d)
+    end
   }
   table.insert(mappable_params_3u, wsyn_fm_ratio)
   params:add(wsyn_fm_ratio)
+
+  local wsyn_fm_ratio_div_exp_param = {
+    id="wsyn_fm_ratio_div_exp",
+    name="wsyn fm ratio divider",
+    type="number",
+    min=-5,
+    max=5,
+    default = 0,
+    action = function(v)
+      params:lookup_param("wsyn_fm_ratio"):bang()
+    end
+  }
+  table.insert(mappable_params_3u, wsyn_fm_ratio_div_exp_param)
+  params:add(wsyn_fm_ratio_div_exp_param)
+
+  -- local wsyn_fm_ratio_controller = {
+  --   id="wsyn_fm_ratio_controller",
+  --   name="wsyn fm ratio",
+
+  -- }
 
   local wsyn_lpg_symmetry = {
     id="wsyn_lpg_symmetry",
@@ -1354,7 +1401,7 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
     if p.type == "binary" then
       table.insert(key_options_3u, p.name)
       key_option_to_id_3u[p.name] = p.id
-    elseif p.type == "number" or p.type == "control" then
+    elseif p.type == "number" or p.type == "control" or p.type == "option" then
       table.insert(enc_options_3u, p.name)
       enc_option_to_id_3u[p.name] = p.id
       table.insert(trackball_options_3u, p.name)
@@ -1638,6 +1685,20 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
   mft_ind_n_detent_val[4] = 115
   mft_ind_n_detent_val[5] = 127
 
+  local mft_ind_n_dot_val = {}
+  mft_ind_n_dot_val[0] = 0
+  mft_ind_n_dot_val[1] = 11
+  mft_ind_n_dot_val[2] = 23
+  mft_ind_n_dot_val[3] = 34
+  mft_ind_n_dot_val[4] = 46
+  mft_ind_n_dot_val[5] = 58
+  mft_ind_n_dot_val[6] = 69
+  mft_ind_n_dot_val[7] = 81
+  mft_ind_n_dot_val[8] = 93
+  mft_ind_n_dot_val[9] = 104
+  mft_ind_n_dot_val[10] = 116
+  mft_ind_n_dot_val[11] = 127
+
   local mft_colors = {
     normal = 0,
     blue = 1,
@@ -1701,8 +1762,6 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
   if mft.name ~= "Midi Fighter Twister" then
     mft = nil
   end
-
-  -- mft_led_settings = {}
 
   -- table of midi cc handlers, hiearchy is ch -> encoder num -> {func = function, state = {}}
   mft_handlers = {}
@@ -1819,6 +1878,120 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
   end
 
   -- ENC 9, wsyn fm ratio
+  mft_handlers[enc_chan][9] = {}
+  mft_handlers[enc_chan][9].state = {
+    delta = 0
+  }
+  mft_handlers[enc_chan][9].func = function(msg)
+    local s = mft_handlers[enc_chan][9].state
+    local desensitivity = 5
+    local p_id = "wsyn_fm_ratio"
+
+    s.delta = s.delta + msg_delta(msg)
+
+    if s.delta % desensitivity == 0 then
+      if s.delta < 0 then
+        params:delta(p_id, -1)
+        s.delta = desensitivity - 1
+      elseif s.delta > 0 then
+        params:delta(p_id, 1)
+        s.delta = (desensitivity - 1) * -1
+      end
+
+      p_redraw()
+    end
+  end
+
+  table.insert(param_callbacks_3u['wsyn_fm_ratio'], function(i)
+    local val
+    local color
+    local offset = 15 -- the index of the start of 1..20
+    local ratio_s = wsyn_ratios[i]
+    local ratio = parse_fraction(ratio_s)
+
+    if ratio % 1 == 0 then
+      if ratio <= 10 then
+        val = ratio
+        color = 'normal'
+      else
+        val = ratio - 10
+        color = 'periwinkle'
+      end
+    else
+      val = i - 1
+      color = 'red'
+    end
+
+    mft:cc(9, mft_ind_n_dot_val[val], enc_chan)
+    mft:cc(9, mft_colors[color], 2)
+  end)
+
+  -- ENC 9 SHIFT, wsyn fm ratio divider
+  mft_handlers[enc_s_chan][9] = {}
+  mft_handlers[enc_s_chan][9].state = {
+    delta = 0
+  }
+  mft_handlers[enc_s_chan][9].func = function(msg)
+    local s = mft_handlers[enc_s_chan][9].state
+    local desensitivity = 5
+    local p_id = "wsyn_fm_ratio_div_exp"
+
+    s.delta = s.delta + msg_delta(msg)
+
+    if s.delta % desensitivity == 0 then
+      if s.delta < 0 then
+        params:delta(p_id, -1)
+        s.delta = desensitivity - 1
+      elseif s.delta > 0 then
+        params:delta(p_id, 1)
+        s.delta = (desensitivity - 1) * -1
+      end
+
+      mft_handlers[switch_chan][9].state.enc_turned = true
+      p_redraw()
+    end
+  end
+
+  table.insert(param_callbacks_3u["wsyn_fm_ratio_div_exp"], function(exp)
+    mft:cc(9, mft_ind_n_dot_val[6+exp], enc_s_chan)
+  end)
+
+  -- ENC 9 SWITCH, reset fm ratio to 4
+  mft_handlers[switch_chan][9] = {}
+  mft_handlers[switch_chan][9].state = {
+    pressed = false,
+    press_time = nil,
+    enc_turned = false
+  }
+  mft_handlers[switch_chan][9].func = function(msg)
+    local s = mft_handlers[switch_chan][9].state
+
+    if msg.val == 127 then -- pressed
+      s.pressed = true
+      s.press_time = util.time()
+      s.enc_turned = false
+      mft_handlers[enc_s_chan][9].delta = 0
+    elseif msg.val == 0 then -- released
+      s.pressed = false
+
+      -- if the encoder was turned, the press was for the encoder's shift
+      if not s.enc_turned then
+        local t = util.time()
+
+        if t - s.press_time >= .25 then -- long press
+
+        else -- short press
+          params:set("wsyn_fm_ratio", params:lookup_param("wsyn_fm_ratio").default)
+          params:set("wsyn_fm_ratio_div_exp", 0)
+        end
+      else
+      end
+
+      s.press_time = nil
+    else
+      error("msg.val was "..msg.val..", expected it to be 0 or 127")
+    end
+  end
 
   -- ENC 10, crow env time
   mft_handlers[enc_chan][10] = {}
@@ -1843,9 +2016,6 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
     delta = 0
   }
   mft_handlers[enc_s_chan][10].func = function(msg)
-    -- params:delta('crow_env_offset', msg_delta(msg))
-    -- p_redraw()
-
     local s = mft_handlers[enc_s_chan][10].state
     local desensitivity = 1
     local p_id = 'crow_env_offset'
@@ -1903,7 +2073,7 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
 
         else -- short press, trigger envelope
           crow.output[out]()
-          enc_10_11_env_animate(nil, nil, out)
+          enc_10_11_env_animate()
         end
       else
       end
