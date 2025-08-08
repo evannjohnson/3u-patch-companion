@@ -1428,6 +1428,21 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
     -- seems like maybe tap tempo has an even lower max time, need to test more
     if sync_sec > rmc_max_time then
       debug_msg("tried to sync RMC with tap time of "..sync_sec..", above maximum delay time")
+      add_animator(7, function()
+        -- make led red
+        mft:cc(7, 85 , 2)
+        mft:cc(7, mft_rgb_brightness_default, 3)
+
+        clock.sleep(1)
+
+        -- make led regular color and turn it off
+        mft:cc(7, 17, 3)
+        mft:cc(7, 0 , 2)
+      end)
+    else
+      -- make rgb led regular to indicate sync
+      mft:cc(7, mft_rgb_brightness_default, 3)
+      mft:cc(7, 0, 2)
     end
 
     if rmc_clock_tap_id then
@@ -2017,6 +2032,118 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
     else -- released
       s.pressed = false
       s.press_time = nil
+    end
+  end
+
+  -- ENC 7, rmc div
+  mft_handlers[enc_chan][7] = {}
+  mft_handlers[enc_chan][7].state = {
+    delta = 0
+  }
+  mft_handlers[enc_chan][7].func = function(msg)
+    local s = mft_handlers[enc_chan][7].state
+    local desensitivity = 5
+    local p_id = "rmc_division"
+
+    s.delta = s.delta + msg_delta(msg)
+
+    if s.delta % desensitivity == 0 then
+      if s.delta < 0 then
+        params:delta(p_id, -1)
+        s.delta = desensitivity - 1
+      elseif s.delta > 0 then
+        params:delta(p_id, 1)
+        s.delta = (desensitivity - 1) * -1
+      end
+
+      p_redraw()
+    end
+  end
+
+  table.insert(param_callbacks_3u['rmc_division'], function(i)
+    mft:cc(7, mft_ind_n_detent_val[i - 6], enc_chan)
+
+    -- turn off led to indicate unsynced
+    mft:cc(7, 17, 3)
+  end)
+
+  -- when changing clock tempo, turn off led to indicate unsynced
+  table.insert(param_callbacks_3u["clock_bpm"], function(bpm)
+    mft:cc(7, 17, 3)
+  end)
+
+  -- when sending clock taps to rmc, make led regular to indicate it's synced
+  -- instead putting this code in the function that sends the clock taps, so that it can differentiate between a successful and unsuccesful sync
+  -- table.insert(param_callbacks_3u["rmc_send_clock_taps"], function()
+  --   mft:cc(7, mft_rgb_brightness_default, 3)
+  --   mft:cc(7, mft_colors['normal'], 2)
+  -- end)
+
+  -- ENC 7 SHIFT, rmc division multiplier exponent
+  mft_handlers[enc_s_chan][7] = {}
+  mft_handlers[enc_s_chan][7].state = {
+    delta = 0
+  }
+  mft_handlers[enc_s_chan][7].func = function(msg)
+    local s = mft_handlers[enc_s_chan][7].state
+    local desensitivity = 5
+    local p_id = "rmc_div_mult_exp"
+
+    s.delta = s.delta + msg_delta(msg)
+
+    if s.delta % desensitivity == 0 then
+      if s.delta < 0 then
+        params:delta(p_id, -1)
+        s.delta = desensitivity - 1
+      elseif s.delta > 0 then
+        params:delta(p_id, 1)
+        s.delta = (desensitivity - 1) * -1
+      end
+
+      mft_handlers[switch_chan][7].state.enc_turned = true
+      p_redraw()
+    end
+  end
+
+  table.insert(param_callbacks_3u["rmc_div_mult_exp"], function(exp)
+    -- turn off rgb led
+    mft:cc(7, 17, 3)
+    mft:cc(7, mft_ind_n_detent_val[exp], enc_s_chan)
+  end)
+
+  -- ENC 7 SWITCH, send sync to rmc
+  mft_handlers[switch_chan][7] = {}
+  mft_handlers[switch_chan][7].state = {
+    pressed = false,
+    press_time = nil,
+    enc_turned = false
+  }
+  mft_handlers[switch_chan][7].func = function(msg)
+    local s = mft_handlers[switch_chan][7].state
+
+    if msg.val == 127 then -- pressed
+      s.pressed = true
+      s.press_time = util.time()
+      s.enc_turned = false
+      mft_handlers[enc_s_chan][7].delta = 0
+    elseif msg.val == 0 then -- released
+      s.pressed = false
+
+      -- if the encoder was turned, the press was for the encoder's shift
+      if not s.enc_turned then
+        local t = util.time()
+
+        if t - s.press_time >= .25 then -- long press
+
+        else -- short press
+          params:set("rmc_send_clock_taps", 1)
+        end
+      else
+      end
+
+      s.press_time = nil
+    else
+      error("msg.val was "..msg.val..", expected it to be 0 or 127")
     end
   end
 
