@@ -57,7 +57,9 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
   -- paste the following into kakoune prompt to get number of params
   -- doesn't work anymore since i'm creating some params programmatically
   -- exec \%sparams:add\(<ret>:echo<space>%val{selection_count}<ret>
-  params:add_group("3u_patch_params", "3U PATCH", 80)
+  params:add_group("3u_patch_params", "3U PATCH", 89)
+
+  params:add_separator("clock_params_3u", "clock n basics")
 
   -- allows keys and encoders to be mapped to nothing
   local empty_param = {
@@ -569,6 +571,8 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
   params:hide("txo_cv_3_oct_delta")
   _menu.rebuild_params()
 
+  params:add_separator("crow_env_params_3u", "crow env")
+
   local crow_env_active = {
     id="crow_env_active",
     name="○ crow env",
@@ -994,6 +998,8 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
   table.insert(mappable_params_3u, crow_clock_div_x2)
   params:add(crow_clock_div_x2)
 
+  params:add_separator("wsyn_params_3u", "wsyn")
+
   local wsyn_curve = {
     id="wsyn_curve",
     name="wsyn curve",
@@ -1122,6 +1128,21 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
     end
   end
 
+  -- given a string with a fraction, returns 2 results: first the numerator, then the denominator
+  local function get_fraction_n_d(fraction_str)
+    local n, d = fraction_str:match("([^/]+)/([^/]+)")
+
+    if not n then
+      n = tonumber(fraction_str)
+    end
+
+    if not d then
+      d = "1"
+    end
+
+    return tonumber(n), tonumber(d)
+  end
+
   wsyn_ratios ={"19/3", "17/4", "15/4", "13/2", "13/3", "11/2", "11/3", "9/2", "7/2", "7/3", "5/2", "3/2", -- 12 elements up to here
   "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20"}
   wsyn_ratios_spicy = {8/3, 5/3, 19/4}
@@ -1247,6 +1268,8 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
       crow.ii.txo.osc_wave(port, x)
     end
   end
+
+  params:add_separator("txo_voice_params_3u", "txo voices")
 
   for i=1,4 do
     local base_id = "txo_voice_"..i
@@ -1382,6 +1405,124 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
   table.insert(mappable_params_3u, crow_ins_to_wsyn)
   params:add(crow_ins_to_wsyn)
 
+  params:add_separator("pedals")
+  pedal_midi = midi.connect(2)
+  rmc_chan = 1
+  rmc_max_time = 4.19
+  blooper_chan = 2
+
+  rmc_clock_tap_id=math.maxinteger
+
+  function rmc_send_clock_taps()
+    local d = parse_fraction(params:string("rmc_division"))
+    local m = 2^params:get("rmc_div_mult_exp")
+    local div = d * m
+    local sync_sec = clock.get_beat_sec() * div
+    -- for unknown reason, need to increase the sync seconds by this much
+    -- to get the expected delay time
+    -- experimentally derived
+    -- seems like a more accurate approach will require more experimentation and
+    -- adapting based on the range of sync_sec
+    sync_sec = sync_sec * 1.1
+
+    -- seems like maybe tap tempo has an even lower max time, need to test more
+    if sync_sec > rmc_max_time then
+      debug_msg("tried to sync RMC with tap time of "..sync_sec..", above maximum delay time")
+    end
+
+    if rmc_clock_tap_id then
+      clock.cancel(rmc_clock_tap_id)
+    end
+
+    rmc_clock_tap_id = clock.run(function()
+      for i=1,4 do
+        pedal_midi:cc(93, 127, 1)
+        clock.sleep(sync_sec)
+      end
+
+      -- for some reason, below approach resulted in too fast of delay times
+      -- above approach works better
+      -- unknown why
+      -- for i=1,4 do
+      --   clock.sync(div)
+      --   pedal_midi:cc(93, 127, rmc_chan)
+      -- end
+    end)
+
+    rmc_clock_tap_id = nil
+  end
+
+  -- if clock changes while sending clock taps, start over
+  table.insert(param_callbacks_3u['clock_bpm'], function(bpm)
+    if rmc_clock_tap_id then
+      rmc_send_clock_taps()
+    end
+  end)
+
+  local rmc_send_clock_taps_param = {
+    id="rmc_send_clock_taps",
+    name="rmc send clock taps @",
+    type="binary",
+    behavior="trigger",
+    action=function(x)
+      rmc_send_clock_taps()
+    end,
+  }
+  table.insert(mappable_params_3u, rmc_send_clock_taps_param)
+  params:add(rmc_send_clock_taps_param)
+
+  rmc_divisions={"1/2", "2/3", "3/4", "4/5", "5/6", "1", "6/5", "5/4", "4/3", "3/2", "2" }
+  local rmc_division_param =  {
+    id="rmc_division",
+    name="rmc division",
+    type="option",
+    options=rmc_divisions,
+    default = 6, -- 1
+    action= function(i)
+      local n,d = get_fraction_n_d(rmc_divisions[i])
+      local mult_exp = params:get("rmc_div_mult_exp")
+
+      if mult_exp < 0 then
+        d = d * (2^(mult_exp * -1))
+      elseif mult_exp > 0 then
+        n = n * (2^mult_exp)
+      end
+
+      local div_str = string.format("%d", n)..""
+
+      if d ~= 1 then
+        div_str = div_str.."/"..string.format("%d", d)
+      end
+
+      params:lookup_param("rmc_send_clock_taps").name = "rmc send clock taps @ "..div_str
+    end
+  }
+  table.insert(mappable_params_3u, rmc_division_param)
+  params:add(rmc_division_param)
+
+  local rmc_div_mult_exp_param = {
+    id="rmc_div_mult_exp",
+    name="rmc division multiplier",
+    type="number",
+    min=-5,
+    max=5,
+    default = 0,
+    action = function(v)
+      params:lookup_param("rmc_division"):bang()
+    end,
+    formatter = function(p)
+      local exp = p.value
+
+      if exp < 0 then
+        return "1/"..string.format("%d", 2^(exp * -1))
+      else
+        return string.format("%d", 2^exp)
+      end
+    end
+  }
+  table.insert(mappable_params_3u, rmc_div_mult_exp_param)
+  params:add(rmc_div_mult_exp_param)
+
   -- create key and encoder action params
   key_options_3u = {}
   key_option_to_id_3u = {}
@@ -1408,6 +1549,8 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
       trackball_option_to_id_3u[p.name] = p.id
     end
   end
+
+  params:add_separator("control_mappings", "control mappings")
 
   local trackball_x_action = {
     id="trackball_x_action",
