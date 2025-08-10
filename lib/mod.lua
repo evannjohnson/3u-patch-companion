@@ -684,7 +684,7 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
     type="control",
     controlspec=controlspec.def{
       min = 0.01,
-      max = 4,
+      max = 8,
       warp = 'exp',
       step = 0.01,
       default = 2,
@@ -1154,15 +1154,15 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
     default = 16, -- 4
     action= function(i)
       local r = parse_fraction(wsyn_ratios[i])
-      local d = 2^params:get("wsyn_fm_ratio_div_exp")
-      crow.ii.wsyn.fm_ratio(r/d)
+      local d = 2^params:get("wsyn_fm_ratio_mult_exp")
+      crow.ii.wsyn.fm_ratio(r*d)
     end
   }
   table.insert(mappable_params_3u, wsyn_fm_ratio)
   params:add(wsyn_fm_ratio)
 
-  local wsyn_fm_ratio_div_exp_param = {
-    id="wsyn_fm_ratio_div_exp",
+  local wsyn_fm_ratio_mult_exp_param = {
+    id="wsyn_fm_ratio_mult_exp",
     name="wsyn fm ratio divider",
     type="number",
     min=-5,
@@ -1172,8 +1172,8 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
       params:lookup_param("wsyn_fm_ratio"):bang()
     end
   }
-  table.insert(mappable_params_3u, wsyn_fm_ratio_div_exp_param)
-  params:add(wsyn_fm_ratio_div_exp_param)
+  table.insert(mappable_params_3u, wsyn_fm_ratio_mult_exp_param)
+  params:add(wsyn_fm_ratio_mult_exp_param)
 
   -- local wsyn_fm_ratio_controller = {
   --   id="wsyn_fm_ratio_controller",
@@ -1284,7 +1284,7 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
       default=0,
       action=make_txo_voice_show_function(i)
     }
-    if i == 2 or i == 4 then
+    if i == 4 then
       show_param.default = 1
     end
     params:add(show_param)
@@ -2204,7 +2204,7 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
   mft_handlers[enc_s_chan][9].func = function(msg)
     local s = mft_handlers[enc_s_chan][9].state
     local desensitivity = 5
-    local p_id = "wsyn_fm_ratio_div_exp"
+    local p_id = "wsyn_fm_ratio_mult_exp"
 
     s.delta = s.delta + msg_delta(msg)
 
@@ -2222,7 +2222,7 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
     end
   end
 
-  table.insert(param_callbacks_3u["wsyn_fm_ratio_div_exp"], function(exp)
+  table.insert(param_callbacks_3u["wsyn_fm_ratio_mult_exp"], function(exp)
     mft:cc(9, mft_ind_n_dot_val[6+exp], enc_s_chan)
   end)
 
@@ -2252,7 +2252,7 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
 
         else -- short press
           params:set("wsyn_fm_ratio", params:lookup_param("wsyn_fm_ratio").default)
-          params:set("wsyn_fm_ratio_div_exp", 0)
+          params:set("wsyn_fm_ratio_mult_exp", 0)
         end
       else
       end
@@ -2271,10 +2271,14 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
     p_redraw()
   end
 
+  local crow_env_time_param = params:lookup_param("crow_env_time")
+  local crow_env_time_min = crow_env_time_param.controlspec.minval
+  local crow_env_time_max = crow_env_time_param.controlspec.maxval
+
   table.insert(param_callbacks_3u['crow_env_time'], function(time)
-    local min = 0.01
-    local max = 4
-    local f = (time - min) / (max - min)
+    -- local min = 0.01
+    -- local max = 4
+    local f = (time - crow_env_time_min) / (crow_env_time_max - crow_env_time_min)
     local val = math.floor(f * 127 + 0.5)
 
     mft:cc(10, val, enc_chan)
