@@ -2363,6 +2363,94 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
     end
   end
 
+  -- ENC 8, wsyn curve
+  mft_handlers[enc_chan][8] = {}
+  mft_handlers[enc_chan][8].state = {}
+  mft_handlers[enc_chan][8].func = function(msg)
+    params:delta('wsyn_curve', msg_delta(msg))
+    p_redraw()
+  end
+
+  table.insert(param_callbacks_3u['wsyn_curve'], function(curve)
+    local min = -5
+    local max = 5
+    local f = (curve - min) / (max - min)
+    local val = math.floor(f * 127 + 0.5)
+
+    mft:cc(8, val, enc_chan)
+  end)
+
+  -- ENC 8 SHIFT, crow env offset
+  mft_handlers[enc_s_chan][8] = {}
+  mft_handlers[enc_s_chan][8].state = {
+    delta = 0
+  }
+  mft_handlers[enc_s_chan][8].func = function(msg)
+    local s = mft_handlers[enc_s_chan][8].state
+    local desensitivity = 1
+    local p_id = 'wsyn_ramp'
+
+    s.delta = s.delta + msg_delta(msg)
+
+    if s.delta % desensitivity == 0 then
+      if s.delta < 0 then
+        params:delta(p_id, -1)
+        s.delta = desensitivity - 1
+      elseif s.delta > 0 then
+        params:delta(p_id, 1)
+        s.delta = (desensitivity - 1) * -1
+      end
+
+      mft_handlers[switch_chan][8].state.enc_turned = true
+      p_redraw()
+    end
+  end
+
+  table.insert(param_callbacks_3u['wsyn_ramp'], function(ramp)
+    local min = -5
+    local max = 5
+    local f = (ramp - min) / (max - min)
+    local val = math.floor(f * 127 + 0.5)
+
+    mft:cc(8, val, enc_s_chan)
+  end)
+
+  -- ENC 8 SWITCH, reset wsyn curve and ramp
+  mft_handlers[switch_chan][8] = {}
+  mft_handlers[switch_chan][8].state = {
+    pressed = false,
+    press_time = nil,
+    enc_turned = false
+  }
+  mft_handlers[switch_chan][8].func = function(msg)
+    local s = mft_handlers[switch_chan][8].state
+
+    if msg.val == 127 then -- pressed
+      s.pressed = true
+      s.press_time = util.time()
+      s.enc_turned = false
+      mft_handlers[enc_s_chan][8].delta = 0
+    elseif msg.val == 0 then -- released
+      s.pressed = false
+
+      -- if the encoder was turned, the press was for the encoder's shift
+      if not s.enc_turned then
+        local t = util.time()
+
+        if t - s.press_time >= .25 then -- long press
+        else -- short press, trigger envelope
+          params:set("wsyn_curve", 5)
+          params:set("wsyn_ramp", 0)
+        end
+      else
+      end
+
+      s.press_time = nil
+    else
+      error("msg.val was "..msg.val..", expected it to be 0 or 127")
+    end
+  end
+
   -- ENC 9, wsyn fm ratio
   mft_handlers[enc_chan][9] = {}
   mft_handlers[enc_chan][9].state = {
