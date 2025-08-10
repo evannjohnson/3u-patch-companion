@@ -57,7 +57,7 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
   -- paste the following into kakoune prompt to get number of params
   -- doesn't work anymore since i'm creating some params programmatically
   -- exec \%sparams:add\(<ret>:echo<space>%val{selection_count}<ret>
-  params:add_group("3u_patch_params", "3U PATCH", 89)
+  params:add_group("3u_patch_params", "3U PATCH", 92)
 
   params:add_separator("clock_params_3u", "clock n basics")
 
@@ -1410,6 +1410,7 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
   rmc_chan = 1
   rmc_max_time = 4.19
   blooper_chan = 2
+  blooper_max_time = 32
 
   rmc_clock_tap_id=math.maxinteger
 
@@ -1537,6 +1538,116 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
   }
   table.insert(mappable_params_3u, rmc_div_mult_exp_param)
   params:add(rmc_div_mult_exp_param)
+
+  blooper_set_loop_clock_id=math.maxinteger
+
+  function blooper_set_loop()
+    local d = parse_fraction(params:string("blooper_division"))
+    local m = 2^params:get("blooper_div_mult_exp")
+    local div = d * m
+    -- local sync_sec = clock.get_beat_sec() * div
+    -- see rmc_send_clock_taps for explanation of this
+    -- sync_sec = sync_sec * 1.1
+
+    -- if sync_sec > blooper_max_time then
+    --   debug_msg("tried to sync blooper with tap time of "..sync_sec..", above maximum time")
+    --   add_animator(7, function()
+    --     -- make led red
+    --     mft:cc(6, 85 , 2)
+    --     mft:cc(6, mft_rgb_brightness_default, 3)
+
+    --     clock.sleep(1)
+
+    --     -- make led regular color and turn it off
+    --     mft:cc(6, 17, 3)
+    --     mft:cc(6, 0 , 2)
+    --   end)
+    -- else
+      -- make rgb led regular to indicate sync
+      mft:cc(6, mft_rgb_brightness_default, 3)
+      mft:cc(6, 0, 2)
+    -- end
+
+    if blooper_set_loop_clock_id then
+      debug_msg("tried to set blooper loop, already in progress, cancelling")
+      clock.cancel(blooper_set_loop_clock_id)
+    end
+
+    blooper_set_loop_clock_id = clock.run(function()
+      -- pedal_midi:cc(7, 127, blooper_chan) -- erase existing loop
+      clock.sync(div)
+      pedal_midi:cc(1, 127, blooper_chan)
+      clock.sync(div)
+      -- clock.sleep(sync_sec)
+      pedal_midi:cc(3, 127, blooper_chan)
+    end)
+
+    blooper_set_loop_clock_id = nil
+  end
+
+  local blooper_set_loop_param = {
+    id="blooper_set_loop",
+    name="blooper set loop @",
+    type="binary",
+    behavior="trigger",
+    action=function(x)
+      blooper_set_loop()
+    end,
+  }
+  table.insert(mappable_params_3u, blooper_set_loop_param)
+  params:add(blooper_set_loop_param)
+
+  blooper_divisions={"1/2", "2/3", "3/4", "4/5", "5/6", "1", "6/5", "5/4", "4/3", "3/2", "2" }
+  local blooper_division_param =  {
+    id="blooper_division",
+    name="blooper division",
+    type="option",
+    options=blooper_divisions,
+    default = 6, -- 1
+    action= function(i)
+      local n,d = get_fraction_n_d(blooper_divisions[i])
+      local mult_exp = params:get("blooper_div_mult_exp")
+
+      if mult_exp < 0 then
+        d = d * (2^(mult_exp * -1))
+      elseif mult_exp > 0 then
+        n = n * (2^mult_exp)
+      end
+
+      local div_str = string.format("%d", n)..""
+
+      if d ~= 1 then
+        div_str = div_str.."/"..string.format("%d", d)
+      end
+
+      params:lookup_param("blooper_set_loop").name = "blooper set loop @ "..div_str
+    end
+  }
+  table.insert(mappable_params_3u, blooper_division_param)
+  params:add(blooper_division_param)
+
+  local blooper_div_mult_exp_param = {
+    id="blooper_div_mult_exp",
+    name="blooper division multiplier",
+    type="number",
+    min=-5,
+    max=5,
+    default = 0,
+    action = function(v)
+      params:lookup_param("blooper_division"):bang()
+    end,
+    formatter = function(p)
+      local exp = p.value
+
+      if exp < 0 then
+        return "1/"..string.format("%d", 2^(exp * -1))
+      else
+        return string.format("%d", 2^exp)
+      end
+    end
+  }
+  table.insert(mappable_params_3u, blooper_div_mult_exp_param)
+  params:add(blooper_div_mult_exp_param)
 
   -- create key and encoder action params
   key_options_3u = {}
@@ -2032,6 +2143,111 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
     else -- released
       s.pressed = false
       s.press_time = nil
+    end
+  end
+
+  -- ENC 6, blooper loop div
+  mft_handlers[enc_chan][6] = {}
+  mft_handlers[enc_chan][6].state = {
+    delta = 0
+  }
+  mft_handlers[enc_chan][6].func = function(msg)
+    local s = mft_handlers[enc_chan][6].state
+    local desensitivity = 5
+    local p_id = "blooper_division"
+
+    s.delta = s.delta + msg_delta(msg)
+
+    if s.delta % desensitivity == 0 then
+      if s.delta < 0 then
+        params:delta(p_id, -1)
+        s.delta = desensitivity - 1
+      elseif s.delta > 0 then
+        params:delta(p_id, 1)
+        s.delta = (desensitivity - 1) * -1
+      end
+
+      p_redraw()
+    end
+  end
+
+  table.insert(param_callbacks_3u['blooper_division'], function(i)
+    mft:cc(6, mft_ind_n_detent_val[i - 6], enc_chan)
+
+    -- turn off led to indicate unsynced
+    mft:cc(6, 17, 3)
+  end)
+
+  -- when changing clock tempo, turn off led to indicate unsynced
+  table.insert(param_callbacks_3u["clock_bpm"], function(bpm)
+    mft:cc(6, 17, 3)
+  end)
+
+  -- ENC 6 SHIFT, blooper division multiplier exponent
+  mft_handlers[enc_s_chan][6] = {}
+  mft_handlers[enc_s_chan][6].state = {
+    delta = 0
+  }
+  mft_handlers[enc_s_chan][6].func = function(msg)
+    local s = mft_handlers[enc_s_chan][6].state
+    local desensitivity = 5
+    local p_id = "blooper_div_mult_exp"
+
+    s.delta = s.delta + msg_delta(msg)
+
+    if s.delta % desensitivity == 0 then
+      if s.delta < 0 then
+        params:delta(p_id, -1)
+        s.delta = desensitivity - 1
+      elseif s.delta > 0 then
+        params:delta(p_id, 1)
+        s.delta = (desensitivity - 1) * -1
+      end
+
+      mft_handlers[switch_chan][6].state.enc_turned = true
+      p_redraw()
+    end
+  end
+
+  table.insert(param_callbacks_3u["blooper_div_mult_exp"], function(exp)
+    -- turn off rgb led
+    mft:cc(6, 17, 3)
+    mft:cc(6, mft_ind_n_detent_val[exp], enc_s_chan)
+  end)
+
+  -- ENC 6 SWITCH, send sync to blooper
+  mft_handlers[switch_chan][6] = {}
+  mft_handlers[switch_chan][6].state = {
+    pressed = false,
+    press_time = nil,
+    enc_turned = false
+  }
+  mft_handlers[switch_chan][6].func = function(msg)
+    local s = mft_handlers[switch_chan][6].state
+
+    if msg.val == 127 then -- pressed
+      s.pressed = true
+      s.press_time = util.time()
+      s.enc_turned = false
+      mft_handlers[enc_s_chan][6].delta = 0
+    elseif msg.val == 0 then -- released
+      s.pressed = false
+
+      -- if the encoder was turned, the press was for the encoder's shift
+      if not s.enc_turned then
+        local t = util.time()
+
+        if t - s.press_time >= .25 then -- long press
+
+        else -- short press
+          params:set("blooper_set_loop", 1)
+        end
+      else
+      end
+
+      s.press_time = nil
+    else
+      error("msg.val was "..msg.val..", expected it to be 0 or 127")
     end
   end
 
