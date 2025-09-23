@@ -2380,7 +2380,7 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
     mft:cc(8, val, enc_chan)
   end)
 
-  -- ENC 8 SHIFT, crow env offset
+  -- ENC 8 SHIFT, wsyn ramp
   mft_handlers[enc_s_chan][8] = {}
   mft_handlers[enc_s_chan][8].state = {
     delta = 0
