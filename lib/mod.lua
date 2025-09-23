@@ -2146,6 +2146,65 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
     end
   end
 
+  -- ENC 4, txo voice 4 shape
+  mft_handlers[enc_chan][4] = {}
+  mft_handlers[enc_chan][4].state = {}
+  mft_handlers[enc_chan][4].func = function(msg)
+    params:delta('txo_voice_4_shape', msg_delta(msg))
+    p_redraw()
+  end
+
+  table.insert(param_callbacks_3u['txo_voice_4_shape'], function(v)
+    local min = 0
+    local max = 5000
+    local f = (v - min) / (max - min)
+    local val = math.floor(f * 127 + 0.5)
+
+    mft:cc(4, val, enc_chan)
+  end)
+
+  -- ENC 4 shift, txo voice 4 level
+  mft_handlers[enc_s_chan][4] = {}
+  mft_handlers[enc_s_chan][4].state = {
+    delta = 0
+  }
+  mft_handlers[enc_s_chan][4].func = function(msg)
+    local s = mft_handlers[enc_s_chan][4].state
+    local desensitivity = 1
+    local p_id = 'txo_voice_4_level'
+
+    s.delta = s.delta + msg_delta(msg)
+
+    if s.delta % desensitivity == 0 then
+      if s.delta < 0 then
+        params:delta(p_id, -10)
+        s.delta = desensitivity - 1
+      elseif s.delta > 0 then
+        params:delta(p_id, 10)
+        s.delta = (desensitivity - 1) * -1
+      end
+
+      mft_handlers[switch_chan][4].state.enc_turned = true
+      p_redraw()
+    end
+  end
+
+  table.insert(param_callbacks_3u['txo_voice_4_level'], function(v)
+    local min = 0
+    local max = 8
+    local f = (v - min) / (max - min)
+    local val = math.floor(f * 127 + 0.5)
+
+    mft:cc(4, val, enc_s_chan)
+  end)
+
+  mft_handlers[switch_chan][4] = {}
+  mft_handlers[switch_chan][4].state = {
+    pressed = false,
+    press_time = nil,
+    enc_turned = false
+  }
+
   -- ENC 6, blooper loop div
   mft_handlers[enc_chan][6] = {}
   mft_handlers[enc_chan][6].state = {
@@ -3377,7 +3436,7 @@ mod.hook.register("script_pre_init", "3u patch companion pre init", function()
     end
   end
 
-  -- ENC 15 SWITCH
+  -- ENC 15 SWITCH, reset beads octave to 0
   mft_handlers[switch_chan][15] = {}
   mft_handlers[switch_chan][15].state = {
     pressed = false,

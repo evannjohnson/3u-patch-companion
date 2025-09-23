@@ -6,6 +6,8 @@ Controls the patch in my 3u rack through crow, primarily controlling params of t
 
 # mft mappings
 encoders:
+- (1,2): txo bass voice (voice 4) waveform shape
+  - shift: txo voice 4 level
 - (3,2): blooper loop div
   - shift: double/halve
   - switch: set blooper loop based on div
@@ -68,6 +70,7 @@ side buttons:
   2. bang params 
 
 # todo
+- [ ] find good txo waveforms, interpolate between them instead of flat scan through values?
 - [ ] more ways of controlling fm ratio
 - [ ] test midi mapping
 - [ ] improve separation of trackball and params
